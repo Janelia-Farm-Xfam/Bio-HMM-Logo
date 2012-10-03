@@ -1,0 +1,20 @@
+TYPEMAP
+P7_HMM*         P7_HMM
+ESL_ALPHABET*   ESL_ALPHABET
+P7_BG*          P7_BG
+
+INPUT
+P7_HMM
+       $var = c_obj($arg,P7_HMM);
+ESL_ALPHABET
+       $var = c_obj($arg,ESL_ALPHABET);
+P7_BG
+       $var = c_obj($arg,P7_BG);
+
+OUTPUT
+P7_HMM
+       $arg = perl_obj($var,"P7_HMM");
+ESL_ALPHABET
+       $arg = perl_obj($var,"ESL_ALPHABET");
+P7_BG
+       $arg = perl_obj($var,"P7_BG");
