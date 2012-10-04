@@ -14,6 +14,8 @@ WriteMakefile(
     PREREQ_PM => {
         'File::Slurp' => 0,
         'Test::More' => 0,
+        'Test::Deep' => 0,
+        'Test::Warn' => 0,
     },
     CONFIGURE_REQUIRES  =>  {
       'Inline::MakeMaker'     => 0.45,

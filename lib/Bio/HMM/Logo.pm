@@ -69,7 +69,7 @@ if you don't export anything, such as for a purely object-oriented module.
 sub hmmToLogoJson {
   my ( $hmmfile, $method ) = @_;
 
-  if ( $method !~ /^(emission|posscore|score)$/ ) {
+  if ( !$method || $method !~ /^(emission|posscore|score)$/ ) {
     warn "Setting character height to default method [emission]\n";
     $method = 'emission';
   }
