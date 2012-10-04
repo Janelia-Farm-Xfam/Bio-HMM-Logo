@@ -122,13 +122,6 @@ typedef struct {
   off_t    doff;	   /* data offset (start of sequence data); -1 if none */
   off_t    eoff;	   /* offset to last byte of record; -1 if unknown     */
 
-  /* Optional information for extra residue markups.
-   * The number of them, and their tags are arbitrary
-   */
-  char  **xr_tag;          /* markup tags for extra residue markups [0..ntr-1][free-text], [0..ntr-1][free-text], or NULL */
-  char  **xr;              /* annotations for extra residue markups [0..ntr-1][0..n-1],    [0..ntr-1][1..n],      or NULL */
-  int     nxr;		   /* number of extra residue markups                                                             */
-
   /* Copy of a pointer to the alphabet, if digital mode */
 #if defined(eslAUGMENT_ALPHABET)
   const ESL_ALPHABET *abc; /* reference to the alphabet for <dsq>              */
@@ -177,7 +170,6 @@ extern int     esl_sq_SetCoordComplete(ESL_SQ *sq, int64_t L);
 extern int     esl_sq_CAddResidue (ESL_SQ *sq, char c);
 extern int     esl_sq_ReverseComplement(ESL_SQ *sq);
 extern int     esl_sq_Checksum(const ESL_SQ *sq, uint32_t *ret_checksum);
-extern int     esl_sq_GetFrequencies(const ESL_DSQ *dsq, int sq_len, const ESL_ALPHABET *abc, float *f);
 
 #ifdef eslAUGMENT_ALPHABET
 extern ESL_SQ *esl_sq_CreateDigital(const ESL_ALPHABET *abc);

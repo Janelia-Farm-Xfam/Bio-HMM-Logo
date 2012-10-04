@@ -140,10 +140,10 @@ AC_ARG_ENABLE(modular,[AS_HELP_STRING([--enable-modular],[compile and prepare mo
     AC_DEFINE(eslLIBRARY)
   ])
 
-# --enable-debugging      - enable basic debugging code (level 1)
+# --enable-debugging      - enable basic debugging code
 # --enable-debugging=x    - also set verbosity level to <x> (1-3)
 #
-# At all levels, replaces CFLAGS w/ "-g -Wall" (so it assumes gcc).
+# At all levels, including 0, replaces CFLAGS w/ "-g -Wall" (so it assumes gcc).
 # Sets the eslDEBUGLEVEL preprocessor symbol to <x>
 #
 AC_ARG_ENABLE(debugging,
@@ -152,7 +152,7 @@ AS_HELP_STRING([--enable-debugging=x],[also set diagnostics verbosity level to <
 enable_debugging=$enableval, enable_debugging=no)
 
 case $enable_debugging in
-   yes)  AC_DEFINE(eslDEBUGLEVEL, 1);;
+   yes)  AC_DEFINE(eslDEBUGLEVEL, 0);;
      1)  AC_DEFINE(eslDEBUGLEVEL, 1);;
      2)  AC_DEFINE(eslDEBUGLEVEL, 2);;
      3)  AC_DEFINE(eslDEBUGLEVEL, 3);;
@@ -275,22 +275,7 @@ ESL_PIC_FLAGS
 # So we need to test that an SSE2 program actually runs without
 # generating an "illegal instruction" error. The program
 # here is sufficient [xref J3/127].
-# Note: some platforms (Ubuntu 32-bit for example) absolutely
-# must have the -msse2 cflag on in order to detect a working
-# emmintrin.h, so we set SIMD_CFLAGS before running the test.
-if test "$enable_sse" = "yes" || test "$enable_sse" = "check"; then
-   if test "x$SIMD_CFLAGS" = x; then
-     case $ax_cv_c_compiler_vendor in
-       gnu)   AX_CHECK_COMPILER_FLAGS(-msse2,[SIMD_CFLAGS="-msse2"],[]);;
-       *)     ;;
-     esac   
-   fi
-fi
 if test "$enable_sse" = "check" && test "$enable_vmx" != "yes"; then
-   sre_save_CFLAGS="$CFLAGS"
-   sre_save_CPPFLAGS="$CPPFLAGS"
-   CFLAGS="$CFLAGS $SIMD_CFLAGS"
-   CPPFLAGS="$CPPFLAGS $SIMD_CFLAGS"
    AC_CHECK_HEADER([emmintrin.h],[
      AC_MSG_CHECKING([if platform can run SSE/SSE2 instructions])
      AC_RUN_IFELSE([AC_LANG_PROGRAM( [[#include <emmintrin.h>]],
@@ -298,12 +283,17 @@ if test "$enable_sse" = "check" && test "$enable_vmx" != "yes"; then
                    [AC_MSG_RESULT([yes])
                      enable_sse=yes],
                    [AC_MSG_RESULT([no])])])
-   CFLAGS="$sre_save_CFLAGS"
-   CPPFLAGS="$sre_save_CPPFLAGS"
 fi
 if test "$enable_sse" = "yes"; then
+   if test "x$SIMD_CFLAGS" = x; then
+     case $ax_cv_c_compiler_vendor in
+       gnu)   AX_CHECK_COMPILER_FLAGS(-msse2,[SIMD_CFLAGS="-msse2"],[]);;
+       *)     ;;
+     esac   
+   fi
    AC_DEFINE(HAVE_SSE2,1,[Support SSE2 (Streaming SIMD Extensions 2) instructions])
 fi
+
 
 
 # VMX/Altivec (not autodetected yet; must use --enable-vmx to enable)
@@ -450,11 +440,11 @@ AC_SYS_LARGEFILE
 AC_CONFIG_HEADERS([esl_config.h])
 AC_CONFIG_FILES([miniapps/Makefile])
 AC_CONFIG_FILES([testsuite/Makefile])
+AC_CONFIG_FILES([documentation/Makefile])
 AC_CONFIG_FILES([Makefile])
 if test -e "LICENSE.sh.in"; then
   AC_CONFIG_FILES(LICENSE.sh)
 fi
-AC_CONFIG_FILES([documentation/Makefile])
 
 
 # 13. voila!
