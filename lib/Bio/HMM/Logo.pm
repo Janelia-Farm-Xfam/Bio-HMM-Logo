@@ -83,15 +83,16 @@ sub hmmToLogoJson {
   my $alph     = inline_get_alphabet_string($abc);
   my @alph_arr = split( //, $alph );
 
-  my $max_height;
+  my $max_height_theoretical = 0;
+  my $max_height_observed = 0;
   my $height_arr_ref;
   if ( $method eq "emission" ) {
-    $max_height     = inline_hmmlogo_maxHeight($abc);
-    $height_arr_ref = inline_get_emission_heights($hmm);
+    $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
+    $height_arr_ref          = inline_get_emission_heights($hmm);
   }
   elsif ( $method eq "posscore" ) {
-    $max_height     = inline_hmmlogo_maxHeight($abc);
-    $height_arr_ref = inline_get_posscore_heights($hmm);
+    $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
+    $height_arr_ref          = inline_get_posscore_heights($hmm);
   }
   elsif ( $method eq "score" ) {
     $height_arr_ref = inline_get_score_heights($hmm);
@@ -99,9 +100,12 @@ sub hmmToLogoJson {
 
   foreach my $row (@$height_arr_ref) {
     my %char_heights;
+    my $height_sum = 0;
     for my $i ( 0 .. $#{$row} ) {
       $char_heights{ $alph_arr[$i] } = 0 + sprintf( "%.3f", ${$row}[$i] );
+      $height_sum += $char_heights{ $alph_arr[$i] } ;
     }
+    $max_height_observed = $height_sum  if ($height_sum > $max_height_observed);
 
     #sort by height
     my @sorted_keys =
@@ -133,12 +137,13 @@ sub hmmToLogoJson {
 
 
   my $height_data_hashref = {
-    max_height      => $max_height,
-    height_arr      => $height_arr_ref,
-    insert_probs    => $insertP,
-    insert_lengths  => $insert_len,
-    occupancy_probs => $deleteP,
-    mmline          => $mm,
+    max_height_theory => $max_height_theoretical,
+    max_height_obs    => $max_height_observed,
+    height_arr        => $height_arr_ref,
+    insert_probs      => $insertP,
+    insert_lengths    => $insert_len,
+    occupancy_probs   => $deleteP,
+    mmline            => $mm,
   };
 
   #This destory was causing issues (no return string) when it occured just
