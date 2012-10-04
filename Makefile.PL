@@ -1,6 +1,26 @@
 use strict;
 use warnings;
 use Inline::MakeMaker;
+use Cwd;
+
+my $orig_location = getcwd;
+
+# need to get included src compiled here:
+# cd to src dir
+my $hmmer_src = __FILE__;
+
+warn $hmmer_src, "\n";
+
+$hmmer_src =~ s/Makefile.PL/src/;
+
+chdir $hmmer_src;
+
+system("./configure");
+system("make");
+
+chdir $orig_location;
+
+
 
 WriteMakefile(
     NAME                => 'Bio::HMM::Logo',

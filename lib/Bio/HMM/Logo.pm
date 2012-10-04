@@ -20,15 +20,15 @@ our $VERSION = '0.01';
 
 my $src_file   = undef;
 my $typemaps   = undef;
-my $src_dir    = undef;
+my $hmmer_src_dir    = undef;
 
 BEGIN {
   $src_file = __FILE__;
   $src_file =~ s/\.pm/\.c/;
 
   my $file = __FILE__;
-  ($src_dir) = $file =~ /^(.*)\/blib/;
-  $src_dir = File::Spec->catfile($src_dir, 'src');
+  ($hmmer_src_dir) = $file =~ /^(.*)\/blib/;
+  $hmmer_src_dir = File::Spec->catfile($hmmer_src_dir, 'src');
   $typemaps = __FILE__;
   $typemaps =~ s/\.pm/\.typemap/;
 }
@@ -37,8 +37,8 @@ use Inline
   C        => "$src_file",
   VERSION  => '0.01',
   ENABLE   => 'AUTOWRAP',
-  INC      => "-I$src_dir -I$src_dir/easel",
-  LIBS     => "-L$src_dir/easel -L$src_dir -lhmmer -leasel",
+  INC      => "-I$hmmer_src_dir/src -I$hmmer_src_dir/easel",
+  LIBS     => "-L$hmmer_src_dir/easel -L$hmmer_src_dir/src -lhmmer -leasel",
   TYPEMAPS => $typemaps,
   NAME     => 'Bio::HMM::Logo';
 
