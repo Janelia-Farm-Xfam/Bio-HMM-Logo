@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use JSON;
 use File::Spec;
+use Imager ':handy';
 
 
 =head1 NAME
@@ -62,11 +63,11 @@ if you don't export anything, such as for a purely object-oriented module.
 
 =cut
 
-=head2 hmmToLogoJson
+=head2 hmmToLogo
 
 =cut
 
-sub hmmToLogoJson {
+sub hmmToLogo {
   my ( $hmmfile, $method ) = @_;
 
   if ( !$method || $method !~ /^(emission|posscore|score)$/ ) {
@@ -154,11 +155,314 @@ sub hmmToLogoJson {
  # inline_destroy_abc($abc);
  # inline_destroy_hmm($hmm);
 
+ return $height_data_hashref;
+
+}
+
+=head2 hmmToLogoJson
+
+=cut
+
+sub hmmToLogoJson {
+  my ($hmmfile, $method) = @_;
+
+  my $height_data_hashref = hmmToLogo($hmmfile, $method);
+
   my $json             = JSON->new->allow_nonref;
   my $height_data_json = $json->encode($height_data_hashref);
 
   return $height_data_json;
+
 }
+
+=head2 hmmToLogoPNG
+
+=cut
+
+sub hmmToLogoPNG {
+  my ($hmmfile, $method, $height, $column_width) = @_;
+
+  my $dna_colors = {
+    'A'=> '#cbf751',
+    'C'=> '#5ec0cc',
+    'G'=> '#ffdf59',
+    'T'=> '#b51f16',
+    'U'=> '#b51f16'
+  };
+
+  my $aa_colors = {
+    'A'=> '#FF9966',
+    'C'=> '#009999',
+    'D'=> '#FF0000',
+    'E'=> '#CC0033',
+    'F'=> '#00FF00',
+    'G'=> '#f2f20c',
+    'H'=> '#660033',
+    'I'=> '#CC9933',
+    'K'=> '#663300',
+    'L'=> '#FF9933',
+    'M'=> '#CC99CC',
+    'N'=> '#336666',
+    'P'=> '#0099FF',
+    'Q'=> '#6666CC',
+    'R'=> '#990000',
+    'S'=> '#0000FF',
+    'T'=> '#00FFFF',
+    'V'=> '#FFCC33',
+    'W'=> '#66CC66',
+    'Y'=> '#006600'
+  };
+
+  my $colors = $dna_colors;
+
+
+  my $regfont  = '/Users/clementsj/Library/Fonts/SourceCodePro-Semibold.ttf';
+  my $boldfont = '/Users/clementsj/SourceCodePro-Bold.ttf';
+
+  my $font = Imager::Font->new(file => $regfont) or die "$!\n";
+  my $bold_font = Imager::Font->new(file => $boldfont) or die "$!\n";
+
+  my $height_data_hashref = hmmToLogo($hmmfile, $method);
+
+  #create PNG
+
+  # determine image width and height
+  $height   ||= 300;
+  $column_width ||= 32;
+  my $left_gutter = 40;
+  my $column_count = scalar @{$height_data_hashref->{height_arr}};
+  my $width   = $column_count * $column_width;
+  $width += $left_gutter;
+
+  # create the image
+  my $image = Imager->new(
+    xsize => $width,
+    ysize => $height,
+  );
+
+  $image->box(
+    filled => 1,
+    color  => 'white'
+  );
+
+
+  for (my $i = 0; $i <= $column_count; $i++) {
+    # draw the divider lines
+    $image->line(
+      color => '#EEEEEE',
+      x1 => $left_gutter + ($i * $column_width),
+      x2 => $left_gutter + ($i * $column_width),
+      y1 => 0,
+      y2 => $height,
+      aa => 1,
+      endp => 1
+    );
+    # draw the ticks
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter + ($i * $column_width),
+      x2 => $left_gutter + ($i * $column_width),
+      y1 => 0,
+      y2 => 5,
+      aa => 1,
+      endp => 1
+    );
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter + ($i * $column_width),
+      x2 => $left_gutter + ($i * $column_width),
+      y1 => $height - 30,
+      y2 => $height - 25,
+      aa => 1,
+      endp => 1
+    );
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter + ($i * $column_width),
+      x2 => $left_gutter + ($i * $column_width),
+      y1 => $height - 15,
+      y2 => $height - 10,
+      aa => 1,
+      endp => 1
+    );
+
+    # draw the column number
+    $image->align_string(
+      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+      y => 2,
+      font => $font,
+      string => $i + 1,
+      color => '#999999',
+      halign => 'center',
+      valign => 'top',
+      size => 10,
+      aa => 1
+    );
+    # fill in the insert odds
+    my $insert_odds = $height_data_hashref->{insert_probs}[$i] / 100;
+    my $insert_fill = '#ffffff';
+    my $insert_text = '#666666';
+    if ($insert_odds > 0.1 ) {
+      $insert_fill = '#d7301f';
+      $insert_text = '#ffffff';
+    }
+    elsif ( $insert_odds > 0.05 ) {
+      $insert_fill = '#fc8d59';
+    }
+    elsif ( $insert_odds > 0.03 ) {
+      $insert_fill = '#fdcc8a';
+    }
+
+    $image->box(
+      color => $insert_fill,
+      xmin => $left_gutter + ($i * $column_width) + 1,
+      ymin => $height - 30,
+      xmax => ($left_gutter + ($i * $column_width) + $column_width) - 1,
+      ymax => $height - 15,
+      filled => 1
+    );
+
+    $image->align_string(
+      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+      y => $height - 27,
+      font => $font,
+      string => $insert_odds,
+      color => $insert_text,
+      halign => 'center',
+      valign => 'top',
+      size => 10,
+      aa => 1
+    );
+    # fill in the insert length
+    my $insert_len = $height_data_hashref->{insert_lengths}[$i];
+    my $length_fill = '#ffffff';
+    my $length_text = '#666666';
+
+    if ($insert_len > 9 ) {
+      $length_fill = '#2171b5';
+      $length_text = '#ffffff';
+    }
+    elsif ( $insert_len > 7 ) {
+      $length_fill = '#6baed6';
+    }
+    elsif ( $insert_len > 4 ) {
+      $length_fill = '#bdd7e7';
+    }
+
+    $image->box(
+      color => $length_fill,
+      xmin => $left_gutter + ($i * $column_width) + 1,
+      ymin => $height - 15,
+      xmax => ($left_gutter + ($i * $column_width) + $column_width) - 1,
+      ymax => $height,
+      filled => 1
+    );
+    $image->align_string(
+      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+      y => $height - 12,
+      font => $font,
+      string => $height_data_hashref->{insert_lengths}[$i],
+      color => $length_text,
+      halign => 'center',
+      valign => 'top',
+      size => 10,
+      aa => 1
+    );
+
+    # draw the logo letters
+    if ($height_data_hashref->{mmline}[$i] == 1) {# the column is masked
+      $image->box(
+        color => '#cccccc',
+        xmin => $left_gutter + ($i * $column_width) + 1,
+        ymin => 1,
+        xmax => ($left_gutter + ($i * $column_width) + $column_width) - 1,
+        ymax => $height - 30,
+        filled => 1
+      );
+    }
+    else { # column is not masked.
+      my $column = $height_data_hashref->{height_arr}[$i];
+      my $previous_height = 0;
+      for my $letter (@$column) {
+        my @values = split ':', $letter, 2;
+        if ($values[1] > 0.01) { # the letter is significant enough to draw
+          my $letter_color = $colors->{$values[0]};
+          my $letter_height = (1 * $values[1]) / $height_data_hashref->{max_height_obs};
+          my $glyph_height = $letter_height * 300;
+
+          my $bbox = $font->bounding_box(
+            string => $values[0],
+            size   => $glyph_height,
+            sizew  => 60
+          );
+
+          my $width = ($bbox->advance_width - $bbox->neg_width);
+
+          $image->string(
+            font => $bold_font,
+            string => $values[0],
+            x => $left_gutter + ($i * $column_width) + ($column_width / 2) - 16,
+            y => ($height - 30) - $previous_height ,
+            size => $glyph_height,
+            sizew => 55,
+            color => $letter_color,
+            aa => 1
+          );
+
+          $previous_height += $bbox->text_height;
+
+        }
+      }
+    }
+
+
+  }
+
+
+  # draw the axes
+  # x-axes
+  $image->line(
+    color => '#999999',
+    x1 => $left_gutter - 5,
+    x2 => $width,
+    y1 => 0,
+    y2 => 0,
+    aa => 1,
+    endp => 1
+  );
+  $image->line(
+    color => '#999999',
+    x1 => $left_gutter,
+    x2 => $width,
+    y1 => $height - 15,
+    y2 => $height - 15,
+    aa => 1,
+    endp => 1
+  );
+  $image->line(
+    color => '#999999',
+    x1 => $left_gutter - 5, # extend a little for the 0 tick mark
+    x2 => $width,
+    y1 => $height - 30,
+    y2 => $height - 30,
+    aa => 1,
+    endp => 1
+  );
+  # y-axis
+  $image->line(
+    color => '#999999',
+    x1 => $left_gutter,
+    x2 => $left_gutter,
+    y1 => 0,
+    y2 => $height,
+    aa => 1,
+    endp => 1
+  );
+  my $png = undef;
+  $image->write(data => \$png, type => 'png') or die $image->errstr;
+  return $png;
+}
+
 
 =head2 dl_load_flags
 =head2 inline_destroy_abc
