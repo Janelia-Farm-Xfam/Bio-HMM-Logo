@@ -17,7 +17,7 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 my $src_file   = undef;
 my $typemaps   = undef;
@@ -180,7 +180,7 @@ sub hmmToLogoJson {
 =cut
 
 sub hmmToLogoPNG {
-  my ($hmmfile, $method, $height, $column_width) = @_;
+  my ($hmmfile, $method, $alphabet, $scaled) = @_;
 
   my $dna_colors = {
     'A'=> '#cbf751',
@@ -214,6 +214,9 @@ sub hmmToLogoPNG {
   };
 
   my $colors = $dna_colors;
+  if ($alphabet && $alphabet eq 'aa') {
+    $colors = $aa_colors;
+  }
 
   my $path = __FILE__;
   $path =~ s|[^/]*$||;
@@ -229,11 +232,17 @@ sub hmmToLogoPNG {
   #create PNG
 
   # determine image width and height
-  $height   ||= 300;
-  $column_width ||= 32;
-  my $left_gutter = 40;
+  my $height       = 300;
+  my $column_width = 32;
+  my $left_gutter  = 40;
   my $column_count = scalar @{$height_data_hashref->{height_arr}};
-  my $width   = $column_count * $column_width;
+  my $width        = $column_count * $column_width;
+
+  my $max_height = $height_data_hashref->{max_height_theory};
+  if (defined $scaled) {
+    $max_height = $height_data_hashref->{max_height_obs};
+  }
+
   $width += $left_gutter;
 
   # create the image
@@ -248,7 +257,7 @@ sub hmmToLogoPNG {
   );
 
 
-  for (my $i = 0; $i <= $column_count; $i++) {
+  for (my $i = 0; $i < $column_count; $i++) {
     # draw the divider lines
     $image->line(
       color => '#EEEEEE',
@@ -389,23 +398,26 @@ sub hmmToLogoPNG {
         my @values = split ':', $letter, 2;
         if ($values[1] > 0.01) { # the letter is significant enough to draw
           my $letter_color = $colors->{$values[0]};
-          my $letter_height = (1 * $values[1]) / $height_data_hashref->{max_height_obs};
-          my $glyph_height = $letter_height * 300;
+          my $letter_height = (1 * $values[1]) / $max_height;
+          my $glyph_height = $letter_height * ($height - 30);
+
+          # there seems to be a reproducible difference between the font height
+          # requested and the height that is rendered. This attempts to correct
+          # that difference.
+          my $fudge_factor = 1.52;
 
           my $bbox = $font->bounding_box(
             string => $values[0],
-            size   => $glyph_height,
+            size   => $glyph_height * $fudge_factor,
             sizew  => 60
           );
-
-          my $width = ($bbox->advance_width - $bbox->neg_width);
 
           $image->string(
             font => $bold_font,
             string => $values[0],
             x => $left_gutter + ($i * $column_width) + ($column_width / 2) - 16,
             y => ($height - 30) - $previous_height ,
-            size => $glyph_height,
+            size => $glyph_height * $fudge_factor,
             sizew => 55,
             color => $letter_color,
             aa => 1
@@ -432,6 +444,17 @@ sub hmmToLogoPNG {
     aa => 1,
     endp => 1
   );
+  $image->align_string(
+    font => $font,
+    string => sprintf('%.2f', $max_height),
+    x => $left_gutter - 5,
+    y => 0,
+    size => 10,
+    halign => 'right',
+    valign => 'top',
+    color => '#666666',
+    aa => 1
+  );
   $image->line(
     color => '#999999',
     x1 => $left_gutter,
@@ -449,6 +472,37 @@ sub hmmToLogoPNG {
     y2 => $height - 30,
     aa => 1,
     endp => 1
+  );
+  $image->align_string(
+    font => $font,
+    string => '0',
+    x => $left_gutter - 5,
+    y => $height - 30,
+    size => 10,
+    halign => 'right',
+    valign => 'center',
+    color => '#666666',
+    aa => 1
+  );
+  $image->line(
+    color => '#999999',
+    x1 => $left_gutter - 5, # extend a little for the midpoint tick mark
+    x2 => $left_gutter,
+    y1 => ($height - 30) / 2,
+    y2 => ($height - 30) / 2,
+    aa => 1,
+    endp => 1
+  );
+  $image->align_string(
+    font => $font,
+    string => sprintf('%.2f', $max_height / 2),
+    x => $left_gutter - 5,
+    y => ($height - 30) / 2,
+    size => 10,
+    halign => 'right',
+    valign => 'center',
+    color => '#666666',
+    aa => 1
   );
   # y-axis
   $image->line(
