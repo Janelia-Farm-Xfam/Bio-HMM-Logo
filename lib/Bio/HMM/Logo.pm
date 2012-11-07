@@ -215,9 +215,11 @@ sub hmmToLogoPNG {
 
   my $colors = $dna_colors;
 
+  my $path = __FILE__;
+  $path =~ s|[^/]*$||;
 
-  my $regfont  = '/Users/clementsj/Library/Fonts/SourceCodePro-Semibold.ttf';
-  my $boldfont = '/Users/clementsj/SourceCodePro-Bold.ttf';
+  my $regfont  = $path .'Logo/Fonts/SourceCodePro-Semibold.ttf';
+  my $boldfont = $path .'Logo/Fonts/SourceCodePro-Bold.ttf';
 
   my $font = Imager::Font->new(file => $regfont) or die "$!\n";
   my $bold_font = Imager::Font->new(file => $boldfont) or die "$!\n";
