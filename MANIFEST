@@ -3,6 +3,9 @@ ignore.txt
 lib/Bio/HMM/Logo.c
 lib/Bio/HMM/Logo.pm
 lib/Bio/HMM/Logo.typemap
+lib/Bio/HMM/Logo/Fonts/LICENSE.txt
+lib/Bio/HMM/Logo/Fonts/SourceCodePro-Bold.ttf
+lib/Bio/HMM/Logo/Fonts/SourceCodePro-Semibold.ttf
 Makefile.PL
 MANIFEST			This list of files
 README
