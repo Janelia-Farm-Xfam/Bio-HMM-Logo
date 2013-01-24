@@ -71,7 +71,6 @@ sub hmmToLogo {
   my ( $hmmfile, $method ) = @_;
 
   if ( !$method || $method !~ /^(emission|posscore|score)$/ ) {
-    warn "Setting character height to default method [emission]\n";
     $method = 'emission';
   }
 

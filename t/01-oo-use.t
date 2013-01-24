@@ -1,8 +1,9 @@
 use strict;
 use warnings;
-use Test::More tests => 6;
+use Test::More tests => 10;
 use Test::Deep;
 use Test::Warn;
+use Test::Exception;
 use File::Slurp;
 use Data::Printer;
 use JSON;
@@ -24,7 +25,8 @@ is($hmmfile, $filename, "expect to see the same filename that we entered on obje
 
 #check the json output
 my $logo_json = undef;
-warning_like {$logo_json = $logo->as_json} qr/Setting character height to default method/;
+lives_ok { $logo_json = $logo->as_json()} qr/Expect the as_png method to work if file is available/;
+
 # compare the json string to the load file
 my $logo_obj = decode_json $logo_json;
 my $expected_obj = decode_json $expected;
@@ -32,4 +34,16 @@ my $expected_obj = decode_json $expected;
 cmp_deeply($logo_obj, $expected_obj, 'The logo json structure was created correctly');
 
 my $png = undef;
-warning_like {$png = $logo->as_png()} qr/Setting character height to default method/;
+lives_ok{$png = $logo->as_png()} qr/Expect the as_png method to work if file is available/;
+
+# test missing files
+my $missing_logo = Bio::HMM::Logo->new({ hmmfile => '/does/not/exist' });
+$logo_json = undef;
+dies_ok {$logo_json = $missing_logo->as_json()} qr/Expect the as_json method to die if hmm file is missing/;
+like $@, qr|/does/not/exist does not exist on disk!|;
+
+# test corrupt files
+my $corrupt_logo = Bio::HMM::Logo->new({ hmmfile => './t/data/test.json' });
+$logo_json = undef;
+dies_ok {$logo_json = $corrupt_logo->as_json()} qr/Expect the as_json method to die if hmm file is bad/;
+like $@, qr|unable to open HMM file at|;
