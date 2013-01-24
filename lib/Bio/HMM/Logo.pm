@@ -520,6 +520,46 @@ sub hmmToLogoPNG {
 }
 
 
+######
+# OO interface
+#
+
+sub new {
+  my ($class, $args) = @_;
+  my $self = {};
+  bless($self, $class);
+  if ($args->{hmmfile}) {
+    $self->hmm_file($args->{hmmfile});
+  }
+  return $self;
+}
+
+sub hmm_file {
+  my ($self, $file) = @_;
+  if ($file) {
+    $self->{_file} = $file;
+  }
+  return $self->{_file};
+}
+
+sub raw {
+  my ($self, $method) = @_;
+  return hmmToLogo($self->hmm_file, $method);
+}
+
+sub as_json {
+  my ($self, $method) = @_;
+  my $height_data_hashref = hmmToLogo($self->hmm_file, $method);
+  my $json             = JSON->new->allow_nonref;
+  my $height_data_json = $json->encode($height_data_hashref);
+  return $height_data_json;
+}
+
+sub as_png {
+  my ($self, $method, $alphabet, $scaled) = @_;
+  return hmmToLogoPNG($self->hmm_file, $method, $alphabet, $scaled);
+}
+
 =head2 dl_load_flags
 =head2 inline_destroy_abc
 =head2 inline_destroy_hmm
