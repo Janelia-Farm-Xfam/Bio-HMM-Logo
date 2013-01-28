@@ -7,12 +7,13 @@ use Test::Exception;
 use File::Slurp;
 use Data::Printer;
 use JSON;
+use FindBin;
 
 # load the module
 BEGIN { use_ok 'Bio::HMM::Logo' }
 # load the hmm and json file
-my $hmmfile = './t/data/test.hmm';
-my $expected = read_file('./t/data/test.json');
+my $hmmfile = $FindBin::Bin . '/data/dna.hmm';
+my $expected = read_file($FindBin::Bin . '/data/test.json');
 # create the json string from hmm
 my $logo_json = undef;
 $logo_json = Bio::HMM::Logo::hmmToLogoJson( $hmmfile );
@@ -27,6 +28,6 @@ $png = Bio::HMM::Logo::hmmToLogoPNG( $hmmfile );
 
 # test corrupt files
 $logo_json = undef;
-my $corrupted = './t/data/test.json';
+my $corrupted = $FindBin::Bin . '/data/test.json';
 dies_ok {$logo_json =  Bio::HMM::Logo::hmmToLogoJson( $corrupted ) } q(Expect the hmmToLogoJson method to die if hmm file is bad);
 like $@, qr|unable to open HMM file at|, q(Error message should report inability to open HMM file);

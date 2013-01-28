@@ -7,12 +7,13 @@ use Test::Exception;
 use File::Slurp;
 use Data::Printer;
 use JSON;
+use FindBin;
 
 # load the module
 BEGIN { use_ok 'Bio::HMM::Logo' }
 # load the hmm and json file
-my $hmmfile = './t/data/test.hmm';
-my $expected = read_file('./t/data/test.json');
+my $hmmfile = $FindBin::Bin . '/data/dna.hmm';
+my $expected = read_file($FindBin::Bin . '/data/test.json');
 # create the json string from hmm
 
 my $logo = Bio::HMM::Logo->new({ hmmfile => $hmmfile });
@@ -43,7 +44,9 @@ dies_ok {$logo_json = $missing_logo->as_json()} q/Expect the as_json method to d
 like $@, qr|/does/not/exist does not exist on disk!|, q(Error message should report HMM file is missing);
 
 # test corrupt files
-my $corrupt_logo = Bio::HMM::Logo->new({ hmmfile => './t/data/test.json' });
+my $corrupt_logo = Bio::HMM::Logo->new({ hmmfile => $FindBin::Bin . '/data/test.json' });
 $logo_json = undef;
 dies_ok {$logo_json = $corrupt_logo->as_json()} q/Expect the as_json method to die if hmm file is bad/;
 like $@, qr|unable to open HMM file at|, q(Error message should report inability to open HMM file);
+
+
