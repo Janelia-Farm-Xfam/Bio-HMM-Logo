@@ -124,7 +124,7 @@ sub hmmToLogo {
 
   my $deleteP = inline_get_deleteP($hmm);
   foreach my $v (@$deleteP) {
-    $v = 0 + sprintf( "%.0f", 100 * ( 1 - $v ) );
+    $v = 0 + sprintf( "%.0f", 100 * $v );
   }
 
 
@@ -137,7 +137,7 @@ sub hmmToLogo {
     height_arr        => $height_arr_ref,
     insert_probs      => $insertP,
     insert_lengths    => $insert_len,
-    occupancy_probs   => $deleteP,
+    delete_probs      => $deleteP,
     mmline            => $mm,
   };
 
