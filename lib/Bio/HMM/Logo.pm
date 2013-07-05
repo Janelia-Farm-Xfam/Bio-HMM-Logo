@@ -518,6 +518,10 @@ sub hmmToLogoPNG {
 # OO interface
 #
 
+=head2 new
+
+=cut
+
 sub new {
   my ($class, $args) = @_;
   my $self = {};
@@ -528,6 +532,10 @@ sub new {
   return $self;
 }
 
+=head2 hmm_file
+
+=cut
+
 sub hmm_file {
   my ($self, $file) = @_;
   if ($file) {
@@ -536,10 +544,18 @@ sub hmm_file {
   return $self->{_file};
 }
 
+=head2 raw
+
+=cut
+
 sub raw {
   my ($self, $method) = @_;
   return hmmToLogo($self->hmm_file, $method);
 }
+
+=head2 as_json
+
+=cut
 
 sub as_json {
   my ($self, $method) = @_;
@@ -548,6 +564,10 @@ sub as_json {
   my $height_data_json = $json->encode($height_data_hashref);
   return $height_data_json;
 }
+
+=head2 as_png
+
+=cut
 
 sub as_png {
   my ($self, $method, $alphabet, $scaled) = @_;
