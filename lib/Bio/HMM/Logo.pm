@@ -80,6 +80,7 @@ sub hmmToLogo {
 
   my $max_height_theoretical = 0;
   my $max_height_observed = 0;
+  my $min_height_observed = 0;
   my $height_arr_ref;
   if ( $method eq "emission" ) {
     $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
@@ -97,11 +98,18 @@ sub hmmToLogo {
   foreach my $row (@$height_arr_ref) {
     my %char_heights;
     my $height_sum = 0;
+    my $neg_height_sum = 0;
     for my $i ( 0 .. $#{$row} ) {
       $char_heights{ $alph_arr[$i] } = 0 + sprintf( "%.3f", ${$row}[$i] );
-      $height_sum += $char_heights{ $alph_arr[$i] } ;
+      if ($char_heights{ $alph_arr[$i] } > 0) {
+        $height_sum += $char_heights{ $alph_arr[$i] } ;
+      }
+      else {
+        $neg_height_sum += $char_heights{ $alph_arr[$i] } ;
+      }
     }
     $max_height_observed = $height_sum  if ($height_sum > $max_height_observed);
+    $min_height_observed = $neg_height_sum  if ($neg_height_sum < $min_height_observed);
 
     #sort by height
     my @sorted_keys =
@@ -135,6 +143,7 @@ sub hmmToLogo {
   my $height_data_hashref = {
     max_height_theory => $max_height_theoretical,
     max_height_obs    => $max_height_observed,
+    min_height_obs    => $min_height_observed,
     height_arr        => $height_arr_ref,
     insert_probs      => $insertP,
     insert_lengths    => $insert_len,
