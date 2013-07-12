@@ -269,6 +269,17 @@ sub _build_png {
     color  => 'white'
   );
 
+  my $top_height = abs($height_data_hashref->{max_height_obs}),
+  my $bottom_height = $height_data_hashref->{min_height_obs};
+  my $abs_bottom_height = abs($bottom_height);
+  my $total_height = $top_height + $abs_bottom_height;
+
+  my $top_percentage = sprintf "%.0f", ($top_height * 100) / $total_height;
+  my $bottom_percentage = sprintf "%.0f", ($abs_bottom_height * 100) / $total_height;
+  #convert percentages to pixels.
+  my $top_pix_height = sprintf "%.0f", (($height - 30) * $top_percentage) / 100;
+  my $bottom_pix_height = sprintf "%.0f", ($height - 30) - $top_pix_height;
+
 
   for (my $i = 0; $i < $column_count; $i++) {
     # draw the divider lines
@@ -407,12 +418,14 @@ sub _build_png {
     else { # column is not masked.
       my $column = $height_data_hashref->{height_arr}[$i];
       my $previous_height = 0;
+      my $previous_neg_height = $top_pix_height;
       for my $letter (@$column) {
         my @values = split ':', $letter, 2;
         if ($values[1] > 0.01) { # the letter is significant enough to draw
+
           my $letter_color = $colors->{$values[0]};
           my $letter_height = (1 * $values[1]) / $max_height;
-          my $glyph_height = $letter_height * ($height - 30);
+          my $glyph_height = $letter_height * ($top_pix_height);
 
           # there seems to be a reproducible difference between the font height
           # requested and the height that is rendered. This attempts to correct
@@ -440,7 +453,7 @@ sub _build_png {
 
           if ($debug) {
             my $xmin = $left_gutter + ($i * $column_width);
-            my $ymax = ($height - 30) - $previous_height;
+            my $ymax = ($top_pix_height) - $previous_height;
             $image->box(
               color => $colors->{'Q'},
               xmin => $xmin,
@@ -451,7 +464,7 @@ sub _build_png {
           }
 
           my $x = $left_gutter + ($i * $column_width);
-          my $y = ($height - 30) - $previous_height - $bbox->text_height;
+          my $y = ($top_pix_height) - $previous_height - $bbox->text_height;
 
           $image->string(
             font => $bold_font,
@@ -468,6 +481,66 @@ sub _build_png {
           $previous_height += $bbox->text_height;
 
         }
+        elsif ($values[1] < 0) { # we are on the bottom section of the graphic
+
+          my $letter_color = $colors->{$values[0]};
+          my $letter_height = (1 * abs($values[1])) / $abs_bottom_height;
+          my $glyph_height = $letter_height * ($bottom_pix_height);
+
+          # there seems to be a reproducible difference between the font height
+          # requested and the height that is rendered. This attempts to correct
+          # that difference.
+          my $fudge_factor = 1.52;
+
+          # the Q in the font we use has a large descender that makes it taller
+          # than it should be, so we have to offset that by making it proportionally
+          # smaller here.
+          if ($values[0] eq 'Q') {
+            $fudge_factor = 1.18;
+          }
+          if ($values[0] =~ /C|G|S|O/) {
+            $fudge_factor = 1.46;
+          }
+          if ($values[0] =~ /J|U/) {
+            $fudge_factor = 1.48;
+          }
+
+          my $bbox = $font->bounding_box(
+            string => $values[0],
+            size   => $glyph_height * $fudge_factor,
+            sizew  => 60
+          );
+
+          if ($debug) {
+            my $xmin = $left_gutter + ($i * $column_width);
+            my $ymax = $previous_neg_height;
+            $image->box(
+              color => $colors->{'Q'},
+              xmin => $xmin,
+              xmax => $xmin + $bbox->display_width,
+              ymin => $ymax - $bbox->text_height,
+              ymax => $ymax,
+            );
+          }
+
+          my $x = $left_gutter + ($i * $column_width);
+          my $y = $previous_neg_height;
+
+          $image->string(
+            font => $bold_font,
+            string => $values[0],
+            x => $x,
+            align => 0,
+            y => $y,
+            size => $glyph_height * $fudge_factor,
+            sizew => 55,
+            color => $letter_color,
+            aa => 1,
+          );
+
+          $previous_neg_height += $bbox->text_height;
+
+        }
       }
     }
 
@@ -476,75 +549,158 @@ sub _build_png {
 
   # draw the axes
   # y-axes
-  $image->line(
-    color => '#999999',
-    x1 => $left_gutter - 5,
-    x2 => $width,
-    y1 => 0,
-    y2 => 0,
-    aa => 1,
-    endp => 1
-  );
-  $image->align_string(
-    font => $font,
-    string => sprintf('%.2f', $max_height),
-    x => $left_gutter - 5,
-    y => 0,
-    size => 10,
-    halign => 'right',
-    valign => 'top',
-    color => '#666666',
-    aa => 1
-  );
-  $image->line(
-    color => '#999999',
-    x1 => $left_gutter,
-    x2 => $width,
-    y1 => $height - 15,
-    y2 => $height - 15,
-    aa => 1,
-    endp => 1
-  );
-  $image->line(
-    color => '#999999',
-    x1 => $left_gutter - 5, # extend a little for the 0 tick mark
-    x2 => $width,
-    y1 => $height - 30,
-    y2 => $height - 30,
-    aa => 1,
-    endp => 1
-  );
-  $image->align_string(
-    font => $font,
-    string => '0',
-    x => $left_gutter - 5,
-    y => $height - 30,
-    size => 10,
-    halign => 'right',
-    valign => 'center',
-    color => '#666666',
-    aa => 1
-  );
-  $image->line(
-    color => '#999999',
-    x1 => $left_gutter - 5, # extend a little for the midpoint tick mark
-    x2 => $left_gutter,
-    y1 => ($height - 30) / 2,
-    y2 => ($height - 30) / 2,
-    aa => 1,
-    endp => 1
-  );
-  $image->align_string(
-    font => $font,
-    string => sprintf('%.2f', $max_height / 2),
-    x => $left_gutter - 5,
-    y => ($height - 30) / 2,
-    size => 10,
-    halign => 'right',
-    valign => 'center',
-    color => '#666666',
-    aa => 1
-  );
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter - 5,
+      x2 => $width,
+      y1 => 0,
+      y2 => 0,
+      aa => 1,
+      endp => 1
+    );
+    $image->align_string(
+      font => $font,
+      string => sprintf('%.1f', $max_height),
+      x => $left_gutter - 5,
+      y => 0,
+      size => 10,
+      halign => 'right',
+      valign => 'top',
+      color => '#666666',
+      aa => 1
+    );
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter,
+      x2 => $width,
+      y1 => $height - 15,
+      y2 => $height - 15,
+      aa => 1,
+      endp => 1
+    );
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter - 5, # extend a little for the 0 tick mark
+      x2 => $width,
+      y1 => $height - 30,
+      y2 => $height - 30,
+      aa => 1,
+      endp => 1
+    );
+    $image->align_string(
+      font => $font,
+      string => sprintf('%.1f', $height_data_hashref->{min_height_obs}),
+      x => $left_gutter - 5,
+      y => $height - 30,
+      size => 10,
+      halign => 'right',
+      valign => 'center',
+      color => '#666666',
+      aa => 1
+    );
+
+  if ($height_data_hashref->{min_height_obs} == 0) { # base line is zero, easy
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter - 5, # extend a little for the midpoint tick mark
+      x2 => $left_gutter,
+      y1 => ($height - 30) / 2,
+      y2 => ($height - 30) / 2,
+      aa => 1,
+      endp => 1
+    );
+    $image->align_string(
+      font => $font,
+      string => sprintf('%.1f', $max_height / 2),
+      x => $left_gutter - 5,
+      y => ($height - 30) / 2,
+      size => 10,
+      halign => 'right',
+      valign => 'center',
+      color => '#666666',
+      aa => 1
+    );
+  }
+  else {
+    # baseline is not zero, so we have to do more work to figure out where the zero
+    # line starts.
+    my $top_height = abs($height_data_hashref->{max_height_obs}),
+    my $bottom_height = $height_data_hashref->{min_height_obs};
+    my $abs_bottom_height = abs($bottom_height);
+    my $total_height = $top_height + $abs_bottom_height;
+
+    my $top_percentage = sprintf "%.0f", ($top_height * 100) / $total_height;
+    my $bottom_percentage = sprintf "%.0f", ($abs_bottom_height * 100) / $total_height;
+
+    #convert percentages to pixels.
+    my $top_pix_height = sprintf "%.0f", (($height - 30) * $top_percentage) / 100;
+    my $bottom_pix_height = sprintf "%.0f", ($height - 30) - $top_pix_height;
+
+    #draw the 0 tick
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter - 5, # extend a little for the 0 tick mark
+      x2 => $width,
+      y1 => $top_pix_height,
+      y2 => $top_pix_height,
+      aa => 1,
+      endp => 1
+    );
+    $image->align_string(
+      font => $font,
+      string => '0',
+      x => $left_gutter - 5,
+      y => $top_pix_height,
+      size => 10,
+      halign => 'right',
+      valign => 'center',
+      color => '#666666',
+      aa => 1
+    );
+    #draw top mid-point
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter - 5, # extend a little for the tick mark
+      x2 => $left_gutter,
+      y1 => $top_pix_height / 2,
+      y2 => $top_pix_height / 2,
+      aa => 1,
+      endp => 1
+    );
+    $image->align_string(
+      font => $font,
+      string => sprintf('%.1f', $top_height / 2),
+      x => $left_gutter - 5,
+      y => $top_pix_height / 2,
+      size => 10,
+      halign => 'right',
+      valign => 'center',
+      color => '#666666',
+      aa => 1
+    );
+    #draw bottom mid-point
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter - 5, # extend a little for the tick mark
+      x2 => $left_gutter,
+      y1 => $top_pix_height + ($bottom_pix_height / 2),
+      y2 => $top_pix_height + ($bottom_pix_height / 2),
+      aa => 1,
+      endp => 1
+    );
+    $image->align_string(
+      font => $font,
+      string => sprintf('%.1f', $bottom_height / 2),
+      x => $left_gutter - 5,
+      y => $top_pix_height + ($bottom_pix_height / 2),
+      size => 10,
+      halign => 'right',
+      valign => 'center',
+      color => '#666666',
+      aa => 1
+    );
+
+  }
 
   # x-axis
   $image->line(
