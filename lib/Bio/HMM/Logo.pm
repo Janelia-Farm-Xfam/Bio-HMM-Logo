@@ -185,6 +185,16 @@ sub hmmToLogoJson {
 
 sub hmmToLogoPNG {
   my ($hmmfile, $method, $alphabet, $scaled) = @_;
+  my $height_data_hashref = hmmToLogo($hmmfile, $method);
+  return _build_png($height_data_hashref, $alphabet, $scaled);
+}
+
+=head2 _build_png
+
+=cut
+
+sub _build_png {
+  my ($height_data_hashref, $alphabet, $scaled, $debug) = @_;
 
   my $dna_colors = {
     'A'=> '#cbf751',
@@ -228,10 +238,9 @@ sub hmmToLogoPNG {
   my $regfont  = $path .'Logo/Fonts/SourceCodePro-Semibold.ttf';
   my $boldfont = $path .'Logo/Fonts/SourceCodePro-Bold.ttf';
 
-  my $font = Imager::Font->new(file => $regfont) or die "$!\n";
-  my $bold_font = Imager::Font->new(file => $boldfont) or die "$!\n";
+  my $font = Imager::Font->new(file => $regfont, color => '#eeeeee') or die "$!\n";
+  my $bold_font = Imager::Font->new(file => $boldfont, color => '#eeeeee') or die "$!\n";
 
-  my $height_data_hashref = hmmToLogo($hmmfile, $method);
 
   #create PNG
 
@@ -410,21 +419,50 @@ sub hmmToLogoPNG {
           # that difference.
           my $fudge_factor = 1.52;
 
+          # the Q in the font we use has a large descender that makes it taller
+          # than it should be, so we have to offset that by making it proportionally
+          # smaller here.
+          if ($values[0] eq 'Q') {
+            $fudge_factor = 1.18;
+          }
+          if ($values[0] =~ /C|G|S|O/) {
+            $fudge_factor = 1.46;
+          }
+          if ($values[0] =~ /J|U/) {
+            $fudge_factor = 1.48;
+          }
+
           my $bbox = $font->bounding_box(
             string => $values[0],
             size   => $glyph_height * $fudge_factor,
             sizew  => 60
           );
 
+          if ($debug) {
+            my $xmin = $left_gutter + ($i * $column_width);
+            my $ymax = ($height - 30) - $previous_height;
+            $image->box(
+              color => $colors->{'Q'},
+              xmin => $xmin,
+              xmax => $xmin + $bbox->display_width,
+              ymin => $ymax - $bbox->text_height,
+              ymax => $ymax,
+            );
+          }
+
+          my $x = $left_gutter + ($i * $column_width);
+          my $y = ($height - 30) - $previous_height - $bbox->text_height;
+
           $image->string(
             font => $bold_font,
             string => $values[0],
-            x => $left_gutter + ($i * $column_width) + ($column_width / 2) - 16,
-            y => ($height - 30) - $previous_height ,
+            x => $x,
+            align => 0,
+            y => $y,
             size => $glyph_height * $fudge_factor,
             sizew => 55,
             color => $letter_color,
-            aa => 1
+            aa => 1,
           );
 
           $previous_height += $bbox->text_height;
