@@ -436,9 +436,8 @@ sub hmmToLogoPNG {
 
   }
 
-
   # draw the axes
-  # x-axes
+  # y-axes
   $image->line(
     color => '#999999',
     x1 => $left_gutter - 5,
@@ -508,7 +507,8 @@ sub hmmToLogoPNG {
     color => '#666666',
     aa => 1
   );
-  # y-axis
+
+  # x-axis
   $image->line(
     color => '#999999',
     x1 => $left_gutter,
