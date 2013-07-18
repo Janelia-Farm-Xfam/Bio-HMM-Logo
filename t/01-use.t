@@ -26,16 +26,14 @@ cmp_deeply($logo_obj, $expected_obj, 'The logo json structure was created correc
 my $png = undef;
 $png = Bio::HMM::Logo::hmmToLogoPNG( $hmmfile );
 
-=for comment
 # this is for testing score height calculations on an amino acid hmm
-my $png_json = read_file( $FindBin::Bin . '/data/png.json' );
+my $png_json = read_file( $FindBin::Bin . '/data/score_calc.json' );
 my $png_input = decode_json $png_json;
-my $aa_png = Bio::HMM::Logo::_build_png( $png_input, 'aa', 1, 'debug');
+my $aa_png = Bio::HMM::Logo::_build_png( $png_input, 1, 'debug');
 open my $png_file, '>', '/tmp/logo_text.png';
 binmode $png_file;
 print $png_file $aa_png;
 close $png_file;
-=cut
 
 # test corrupt files
 $logo_json = undef;

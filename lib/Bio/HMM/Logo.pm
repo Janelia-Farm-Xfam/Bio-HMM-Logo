@@ -43,6 +43,13 @@ use Inline
   TYPEMAPS => $typemaps,
   NAME     => 'Bio::HMM::Logo';
 
+# as defined in esl_alphabet.h
+##define eslUNKNOWN     0
+##define eslRNA         1
+##define eslDNA         2
+##define eslAMINO       3
+my @alphabet = qw( unk rna dna aa );
+
 =head1 SYNOPSIS
 
 Quick summary of what the module does.
@@ -137,10 +144,12 @@ sub hmmToLogo {
   }
 
 
+  my $abc_type = inline_get_abc_type($hmm);
   my $mm = inline_get_MM_array($hmm);
 
 
   my $height_data_hashref = {
+    alphabet          => $alphabet[$abc_type],
     max_height_theory => $max_height_theoretical,
     max_height_obs    => $max_height_observed,
     min_height_obs    => $min_height_observed,
@@ -184,9 +193,9 @@ sub hmmToLogoJson {
 =cut
 
 sub hmmToLogoPNG {
-  my ($hmmfile, $method, $alphabet, $scaled) = @_;
+  my ($hmmfile, $method, $scaled) = @_;
   my $height_data_hashref = hmmToLogo($hmmfile, $method);
-  return _build_png($height_data_hashref, $alphabet, $scaled);
+  return _build_png($height_data_hashref, $scaled);
 }
 
 =head2 _build_png
@@ -194,7 +203,7 @@ sub hmmToLogoPNG {
 =cut
 
 sub _build_png {
-  my ($height_data_hashref, $alphabet, $scaled, $debug) = @_;
+  my ($height_data_hashref, $scaled, $debug) = @_;
 
   my $dna_colors = {
     'A'=> '#cbf751',
@@ -228,7 +237,8 @@ sub _build_png {
   };
 
   my $colors = $dna_colors;
-  if ($alphabet && $alphabet eq 'aa') {
+  if (exists $height_data_hashref->{alphabet}
+    && $height_data_hashref->{alphabet} eq 'aa') {
     $colors = $aa_colors;
   }
 
@@ -618,8 +628,8 @@ sub as_json {
 =cut
 
 sub as_png {
-  my ($self, $method, $alphabet, $scaled) = @_;
-  return hmmToLogoPNG($self->hmm_file, $method, $alphabet, $scaled);
+  my ($self, $method, $scaled) = @_;
+  return hmmToLogoPNG($self->hmm_file, $method, $scaled);
 }
 
 =head2 dl_load_flags
@@ -627,6 +637,7 @@ sub as_png {
 =head2 inline_destroy_hmm
 =head2 inline_get_MM_array
 =head2 inline_get_abc
+=head2 inline_get_abc_type
 =head2 inline_get_alphabet_string
 =head2 inline_get_deleteP
 =head2 inline_get_emission_heights

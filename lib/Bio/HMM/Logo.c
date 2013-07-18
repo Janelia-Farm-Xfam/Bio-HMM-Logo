@@ -290,6 +290,12 @@ inline_get_abc ( SV *hmm_p) {
   return perl_obj(hmm->abc,"ESL_ALPHABET");
 }
 
+
+int inline_get_abc_type ( SV *hmm_p) {
+  P7_HMM      *hmm      = c_obj(hmm_p, P7_HMM);
+  return hmm->abc->type;
+}
+
 SV*
 inline_destroy_abc ( SV *abc_p) {
   ESL_ALPHABET  *abc      = c_obj(abc_p, ESL_ALPHABET);
