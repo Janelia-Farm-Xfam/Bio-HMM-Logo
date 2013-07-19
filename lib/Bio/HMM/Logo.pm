@@ -158,6 +158,7 @@ sub hmmToLogo {
     insert_lengths    => $insert_len,
     delete_probs      => $deleteP,
     mmline            => $mm,
+    height_calc       => $method,
   };
 
   #This destroy was causing issues (no return string) when it occurred just
@@ -261,9 +262,14 @@ sub _build_png {
   my $column_count = scalar @{$height_data_hashref->{height_arr}};
   my $width        = $column_count * $column_width;
 
-  my $max_height = $height_data_hashref->{max_height_theory};
+
+
+  my $max_height = $height_data_hashref->{max_height_obs};
   if (defined $scaled) {
-    $max_height = $height_data_hashref->{max_height_obs};
+    if (exists $height_data_hashref->{height_calc}
+      && $height_data_hashref->{height_calc} eq 'emission') {
+      $max_height = $height_data_hashref->{max_height_theory};
+    }
   }
 
   $width += $left_gutter;
