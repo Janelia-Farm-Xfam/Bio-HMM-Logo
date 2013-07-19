@@ -160,7 +160,7 @@ sub hmmToLogo {
     mmline            => $mm,
   };
 
-  #This destory was causing issues (no return string) when it occured just
+  #This destroy was causing issues (no return string) when it occurred just
   #before the return.  I think that perl would actually look after us and
   #garbage collect anyway, but this seems to solve the problem. I can not
   #explain why it was destroying the JSON object, possibly a memory violation.
