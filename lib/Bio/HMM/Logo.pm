@@ -99,7 +99,7 @@ sub hmmToLogo {
   }
   elsif ( $method eq "score" ) {
     $height_arr_ref = inline_get_score_heights($hmm);
-    $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
+    $max_height_theoretical  = -1; # this field is not meaningful for the "score" method
   }
 
   foreach my $row (@$height_arr_ref) {
