@@ -72,8 +72,8 @@ Perhaps a little code snippet.
 sub hmmToLogo {
   my ( $hmmfile, $method ) = @_;
 
-  if ( !$method || $method !~ /^(emission|posscore|score)$/ ) {
-    $method = 'emission';
+  if ( !$method || $method !~ /^(entropy_all|entropy_above|score)$/ ) {
+    $method = 'entropy_all';
   }
 
   unless ( -e $hmmfile ) {
@@ -89,13 +89,13 @@ sub hmmToLogo {
   my $max_height_observed = 0;
   my $min_height_observed = 0;
   my $height_arr_ref;
-  if ( $method eq "emission" ) {
+  if ( $method eq "entropy_all" ) {
     $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
-    $height_arr_ref          = inline_get_emission_heights($hmm);
+    $height_arr_ref          = inline_get_relative_entropy_all($hmm);
   }
-  elsif ( $method eq "posscore" ) {
+  elsif ( $method eq "entropy_above" ) {
     $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
-    $height_arr_ref          = inline_get_posscore_heights($hmm);
+    $height_arr_ref          = inline_get_relative_entropy_above_bg($hmm);
   }
   elsif ( $method eq "score" ) {
     $height_arr_ref = inline_get_score_heights($hmm);
@@ -152,7 +152,7 @@ sub hmmToLogo {
     alphabet          => $alphabet[$abc_type],
     max_height_theory => $max_height_theoretical,
     max_height_obs    => $max_height_observed,
-    min_height_obs    => $min_height_observed,
+    min_height_obs    => "$min_height_observed",
     height_arr        => $height_arr_ref,
     insert_probs      => $insertP,
     insert_lengths    => $insert_len,
@@ -715,10 +715,10 @@ sub as_png {
 =head2 inline_get_abc_type
 =head2 inline_get_alphabet_string
 =head2 inline_get_deleteP
-=head2 inline_get_emission_heights
+=head2 inline_get_relative_entropy_all
 =head2 inline_get_insertLengths
 =head2 inline_get_insertP
-=head2 inline_get_posscore_heights
+=head2 inline_get_relative_entropy_above_bg
 =head2 inline_get_score_heights
 =head2 inline_hmmlogo_maxHeight
 =head2 inline_read_hmm

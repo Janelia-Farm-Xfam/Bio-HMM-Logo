@@ -1,20 +1,19 @@
-#include "hmmer.h"
+#include "p7_config.h"
+
 #include <sys/times.h>
+#include <string.h>
 
 #include "easel.h"
-#include <string.h>
+
+#include "hmmer.h"
 
 static ESL_OPTIONS options[] = {
   /* name           type      default  env  range     toggles   reqs   incomp              help                                                      docgroup*/
   { "-h",           eslARG_NONE,      FALSE, NULL, NULL,    NULL,  NULL,  NULL,    "show brief help on version and usage",                      1 },
-
   { "--out",      eslARG_STRING,     "none", NULL, NULL,    NULL,  NULL,  NULL,    "save list of hits to file <s>  ('-' writes to stdout)",     2 },
   { "--count_only", eslARG_NONE,      FALSE, NULL, NULL,    NULL,  NULL,  NULL,    "compute just counts, not locations",                        2 },
-
   {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
-
-
 static char usage[]  = "[options] <qfile> <fmfile>";
 static char banner[] = "Find all instances of each <qfile> sequence in the database represented by <fmfile>";
 
@@ -32,7 +31,7 @@ process_commandline(int argc, char **argv, ESL_GETOPTS **ret_go, char **ret_fmfi
   /* help format: */
   if (esl_opt_GetBoolean(go, "-h") == TRUE) 
     {
-      p7_banner(stdout, argv[0], banner);
+      esl_banner(stdout, argv[0], banner);
       esl_usage(stdout, argv[0], usage);
 
       if (puts("\nBasic options:") < 0) ESL_XEXCEPTION_SYS(eslEWRITE, "write failed");
@@ -93,12 +92,22 @@ static int
 output_header(FM_METADATA *meta, FILE *ofp, const ESL_GETOPTS *go, char *fmfile, char *qfile)
 {
   char *alph;
+  char *appname = NULL;
+  int   status;
 
   if      (meta->alph_type == fm_DNA)       alph = "dna";
   else if (meta->alph_type == fm_DNA_full)  alph = "dna_full";
   else if (meta->alph_type == fm_AMINO)     alph = "amino";
 
-  p7_banner(ofp, go->argv[0], banner);
+  if ((status = esl_FileTail(go->argv[0], FALSE, &appname)) != eslOK) return status;
+
+
+
+  if (fprintf(ofp, "# %s :: %s\n", appname, banner)                                               < 0) ESL_XEXCEPTION_SYS(eslEWRITE, "write failed");
+  if (fprintf(ofp, "# %s\n", EASEL_COPYRIGHT)                                                     < 0) ESL_XEXCEPTION_SYS(eslEWRITE, "write failed");
+  if (fprintf(ofp, "# %s\n", EASEL_LICENSE)                                                       < 0) ESL_XEXCEPTION_SYS(eslEWRITE, "write failed");
+  if (fprintf(ofp, "# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n") < 0) ESL_XEXCEPTION_SYS(eslEWRITE, "write failed");
+
 
   if (fprintf(ofp, "# input binary-formatted HMMER database:   %s\n", fmfile) < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (fprintf(ofp, "# input file of query sequences:           %s\n", qfile)  < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
@@ -114,7 +123,15 @@ output_header(FM_METADATA *meta, FILE *ofp, const ESL_GETOPTS *go, char *fmfile,
   if (fprintf(ofp, "# bin_length   :                           %d\n", meta->freq_cnt_b)             < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (fprintf(ofp, "# suffix array sample rate:                %d\n", meta->freq_SA)                < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (fprintf(ofp, "# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n\n") < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
-  return eslOK;
+
+
+  if (appname) free(appname);
+    return eslOK;
+
+ERROR:
+if (appname) free(appname);
+return status;
+
 }
 
 
@@ -126,19 +143,17 @@ output_header(FM_METADATA *meta, FILE *ofp, const ESL_GETOPTS *go, char *fmfile,
  *            to String Pattern Matching). Most of the meat is in the method of counting
  *            characters - bwt_getOccCount, which depends on compilation choices.
  */
-//#ifndef FMDEBUG
-//inline
-//#endif
 int
 getFMHits( FM_DATA *fm, FM_CFG *cfg, FM_INTERVAL *interval, int block_id, int hit_offset, int hit_length, FM_HIT *hits_ptr, int fm_direction) {
 
   int i, j, len = 0;
+  int dist_from_end;
 
   for (i = interval->lower;  i<= interval->upper; i++) {
     j = i;
     len = 0;
 
-    while ( j != fm->term_loc && (j & cfg->maskSA)) { //go until we hit a position in the full SA that was sampled during FM index construction
+    while ( j != fm->term_loc && (j % cfg->meta->freq_SA)) { //go until we hit a position in the full SA that was sampled during FM index construction
       uint8_t c = fm_getChar( cfg->meta->alph_type, j, fm->BWT);
       j = fm_getOccCount (fm, cfg, j-1, c);
       j += abs(fm->C[c]);
@@ -150,9 +165,17 @@ getFMHits( FM_DATA *fm, FM_CFG *cfg, FM_INTERVAL *interval, int block_id, int hi
     hits_ptr[hit_offset + i - interval->lower].direction = fm_direction;
     hits_ptr[hit_offset + i - interval->lower].length    = hit_length;
 
-    hits_ptr[hit_offset + i - interval->lower].start     = len + (j==fm->term_loc ? 0 : fm->SA[ j >> cfg->shiftSA ]) ; // len is how many backward steps we had to take to find a sampled SA position
-    if (fm_direction == fm_backward)
-      hits_ptr[hit_offset + i - interval->lower].start  +=  hit_length - 1 ;
+    dist_from_end = len + (j==fm->term_loc ? 0 : fm->SA[ j / cfg->meta->freq_SA ]) ; // len is how many backward steps we had to take to find a sampled SA position
+
+    if (fm_direction == fm_forward)
+      dist_from_end += hit_length;
+    else
+      dist_from_end += 1;
+
+    //the SA is on the reversed string.  What would be the position in the unreversed string?
+    hits_ptr[hit_offset + i - interval->lower].start = fm->N - dist_from_end;
+
+    //printf ("SA: %d\n", hits_ptr[hit_offset + i - interval->lower].start);
 
   }
 
@@ -181,15 +204,14 @@ hit_sorter(const void *a, const void *b)
 
 /* Function:  main()
  * Synopsis:  Run set of queries against an FM
- * Incept:    TJW, Fri Dec 24 21:30:51 MST 2010 [Tucson]
  * Purpose:   Read in a FM and a file of query sequences.
  *            For each query, find matching FM interval, then collect positions in
- *            the original text T for the corresponding occurences. These positions
+ *            the original text T for the corresponding occurrences. These positions
  *            are 0-based (so first character is position 0).
  */
 int
-main(int argc,  char *argv[]) {
-
+main(int argc,  char *argv[]) 
+{
   void* tmp; // used for RALLOC calls
   clock_t t1, t2;
   struct tms ts1, ts2;
@@ -207,16 +229,15 @@ main(int argc,  char *argv[]) {
   int i;
   int count_only    = 0;
 
-  FM_DATA *fmsf;
-  FM_DATA *fmsb;
   FM_INTERVAL interval;
-  FILE* fp_fm = NULL;
-  FILE* fp = NULL;
-  FILE* out = NULL;
+  FM_DATA *fmsf = NULL;
+  FM_DATA *fmsb = NULL;
+  FILE* fp_fm   = NULL;
+  FILE* fp      = NULL;
+  FILE* out     = NULL;
   char *outname = NULL;
 
   ESL_GETOPTS     *go  = NULL;    /* command line processing                 */
-  void *cfg_mem; //used to ensure cfg is 16-byte aligned, which matters since, for sse/vmx implementations, elements within cfg need to be aligned thusly
   FM_CFG *cfg;
   FM_METADATA *meta;
 
@@ -232,7 +253,7 @@ main(int argc,  char *argv[]) {
       out = stdout;
       outname = "stdout";
     } else {
-      out = fopen(optarg,"w");
+      out = fopen(outname,"w");
     }
   }
 
@@ -244,44 +265,40 @@ main(int argc,  char *argv[]) {
     esl_fatal("Cannot open file `%s': ", fname_fm);
 
 
-  fm_configAlloc(&cfg_mem, &cfg);
+  fm_configAlloc(&cfg);
   cfg->occCallCnt = 0;
   meta = cfg->meta;
   meta->fp = fp_fm;
 
 
-
   fm_readFMmeta( meta);
 
+
   //read in FM-index blocks
-  ESL_ALLOC(fmsf, cfg->meta->block_count * sizeof(FM_DATA) );
+  ESL_ALLOC(fmsf, meta->block_count * sizeof(FM_DATA) );
   if (!meta->fwd_only)
     ESL_ALLOC(fmsb, meta->block_count * sizeof(FM_DATA) );
 
   for (i=0; i<meta->block_count; i++) {
-    fm_readFM( fmsf+i,meta, 1 );
+    fm_FM_read( fmsf+i,meta, TRUE );
 
     if (!meta->fwd_only) {
-      fm_readFM(fmsb+i, meta, 0 );
+      fm_FM_read(fmsb+i, meta, FALSE );
       fmsb[i].SA = fmsf[i].SA;
       fmsb[i].T = fmsf[i].T;
     }
   }
   fclose(fp_fm);
 
-  output_header(cfg->meta, stdout, go, fname_fm, fname_queries);
+  output_header(meta, stdout, go, fname_fm, fname_queries);
 
 
   /* initialize a few global variables, then call initGlobals
    * to do architecture-specific initialization
    */
-  cfg->maskSA       =  meta->freq_SA - 1;
-  cfg->shiftSA      =  meta->SA_shift;
-  fm_initConfig(cfg, NULL);
+  fm_configInit(cfg, NULL);
 
-
-  fm_createAlphabet(meta, NULL); // don't override charBits
-
+  fm_alphabetCreate(meta, NULL); // don't override charBits
 
   fp = fopen(fname_queries,"r");
   if (fp == NULL)
@@ -292,7 +309,6 @@ main(int argc,  char *argv[]) {
   hits_size = 200;
   ESL_ALLOC(hits, hits_size * sizeof(FM_HIT));
 
-
   while(fgets(line, FM_MAX_LINE, fp) ) {
     int qlen=0;
     while (line[qlen] != '\0' && line[qlen] != '\n')  qlen++;
@@ -302,7 +318,7 @@ main(int argc,  char *argv[]) {
 
     for (i=0; i<meta->block_count; i++) {
 
-      fm_getSARangeForward(fmsb+i, cfg, line, meta->inv_alph, &interval);// yes, use the backward fm to produce a forward search on the forward fm
+      fm_getSARangeReverse(fmsf+i, cfg, line, meta->inv_alph, &interval);
       if (interval.lower>0 && interval.lower <= interval.upper) {
         int new_hit_num =  interval.upper - interval.lower + 1;
         hit_num += new_hit_num;
@@ -311,17 +327,15 @@ main(int argc,  char *argv[]) {
             hits_size = 2*hit_num;
             ESL_RALLOC(hits, tmp, hits_size * sizeof(FM_HIT));
           }
-          //even though I used fmsb above, use fmsf here, since we'll now do a backward trace
-          //in the FM-index to find the next sampled SA position
           getFMHits(fmsf+i, cfg, &interval, i, hit_num-new_hit_num, qlen, hits, fm_forward);
         }
+
       }
 
 
       /* find reverse hits, using backward search on the forward FM*/
-
       if (!meta->fwd_only) {
-        fm_getSARangeReverse(fmsf+i, cfg, line, meta->inv_alph, &interval);
+        fm_getSARangeForward(fmsb+i, cfg, line, meta->inv_alph, &interval);// yes, use the backward fm to produce the equivalent of a forward search on the forward fm
         if (interval.lower>0 && interval.lower <= interval.upper) {
           int new_hit_num =  interval.upper - interval.lower + 1;
           hit_num += new_hit_num;
@@ -330,13 +344,15 @@ main(int argc,  char *argv[]) {
               hits_size = 2*hit_num;
               ESL_RALLOC(hits, tmp, hits_size * sizeof(FM_HIT));
             }
+            //even though I used fmsb above, use fmsf here, since we'll now do a backward trace
+            //in the FM-index to find the next sampled SA position
             getFMHits(fmsf+i, cfg, &interval, i, hit_num-new_hit_num, qlen, hits, fm_backward);
           }
         }
+
       }
 
     }
-
 
 
     if (hit_num > 0) {
@@ -349,8 +365,10 @@ main(int argc,  char *argv[]) {
         //for each hit, identify the sequence id and position within that sequence
         for (i = 0; i< hit_num; i++) {
 
-          fm_getOriginalPosition (fmsf, meta, hits[i].block, hits[i].length, hits[i].direction, hits[i].start,  &(hits[i].block), &(hits[i].start) );
-          hits[i].sortkey = hits[i].block == -1 ? -1 : meta->seq_data[ hits[i].block ].id;
+          status = fm_getOriginalPosition (fmsf, meta, hits[i].block, hits[i].length, hits[i].direction, hits[i].start,  &(hits[i].block), &(hits[i].start) );
+          hits[i].sortkey = (status==eslERANGE ? -1 : meta->seq_data[ hits[i].block ].id);
+
+          //printf("block %d , start %d\n", hits[i].block, hits[i].start);
 
           if (hits[i].sortkey != -1)
             hit_num2++; // legitimate hit
@@ -358,7 +376,6 @@ main(int argc,  char *argv[]) {
         }
         if (hit_num2 > 0)
           hit_cnt++;
-
 
         //now sort according the the sequence_id corresponding to that seq_offset
         qsort(hits, hit_num, sizeof(FM_HIT), hit_sorter);
@@ -371,6 +388,7 @@ main(int argc,  char *argv[]) {
           i++;
         }
 
+
         if (i < hit_num) {
           if (out != NULL) {
             fprintf (out, "%s\n",line);
@@ -379,6 +397,7 @@ main(int argc,  char *argv[]) {
           }
           hit_indiv_cnt++;
           i++; // skip the first one, since I'll be comparing each to the previous
+
           for (  ; i< hit_num; i++) {
             if ( //meta->seq_data[ hits[i].block ].id != meta->seq_data[ hits[i-1].block ].id ||
                  hits[i].sortkey   != hits[i-1].sortkey ||  //sortkey is seq_data[].id
@@ -403,23 +422,17 @@ main(int argc,  char *argv[]) {
   }
 
   for (i=0; i<meta->block_count; i++) {
-    fm_freeFM( fmsb+i, 1 );
+    fm_FM_destroy( fmsf+i, 1 );
     if (!meta->fwd_only)
-      fm_freeFM( fmsf+i, 0 );
+      fm_FM_destroy( fmsb+i, 0 );
   }
 
-  for (i=0; i<meta->seq_count; i++)
-    free (meta->seq_data[i].name);
-
-  free (meta->seq_data);
 
   free (hits);
   free (line);
   fclose(fp);
 
-  fm_destroyConfig(cfg);
-  free (cfg->meta);
-  free(cfg_mem); //16-byte aligned memory in which cfg is found
+  fm_configDestroy(cfg);
 
 
   // compute and print the elapsed time in millisec

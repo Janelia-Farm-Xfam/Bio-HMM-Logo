@@ -21,12 +21,12 @@
 
 #include "hmmer.h"
 
-#ifdef P7_IMPL_DUMMY_INCLUDED
-#include "esl_vectorops.h"
-#define NHMMER_MAX_RESIDUE_COUNT (1024 * 100)
-#else
-#define NHMMER_MAX_RESIDUE_COUNT (10000000)  /* 10 million bases */
-#endif
+//#ifdef P7_IMPL_DUMMY_INCLUDED
+//#include "esl_vectorops.h"
+//#define NHMMER_MAX_RESIDUE_COUNT (1024 * 100)
+//#else
+//#define NHMMER_MAX_RESIDUE_COUNT (10000000)  /* 10 million bases */
+//#endif
 
 
 
@@ -61,16 +61,11 @@ static ESL_OPTIONS options[] = {
   { "-o",           eslARG_OUTFILE, NULL, NULL, NULL,    NULL,  NULL,  NULL,            "direct output to file <f>, not stdout",                         2 },
   { "--tblout",     eslARG_OUTFILE, NULL, NULL, NULL,    NULL,  NULL,  NULL,            "save parseable table of per-sequence hits to file <s>",         2 },
   { "--dfamtblout", eslARG_OUTFILE,      NULL, NULL, NULL,    NULL,  NULL,  NULL,              "save table of hits to file, in Dfam format <s>",               2 },
-  { "--longinsertout", eslARG_OUTFILE,   NULL, NULL, NULL,    NULL,  NULL,  NULL,              "save table of long inserts to file <s>",                       2 },
-  { "--insertlength", eslARG_INT,        "40", NULL, "n>=5",  NULL,  "--longinsertout",  NULL, "min length of insert printed to --longinsertout",              2 },
   { "--aliscoresout", eslARG_OUTFILE,   NULL, NULL, NULL,    NULL,  NULL,  NULL,               "save of scores for each position in each alignment to <s>",    2 },
   { "--acc",        eslARG_NONE,   FALSE, NULL, NULL,    NULL,  NULL,  NULL,            "prefer accessions over names in output",                        2 },
   { "--noali",      eslARG_NONE,   FALSE, NULL, NULL,    NULL,  NULL,  NULL,            "don't output alignments, so output is smaller",                 2 },
   { "--notextw",    eslARG_NONE,    NULL, NULL, NULL,    NULL,  NULL, "--textw",        "unlimit ASCII text output line width",                          2 },
   { "--textw",      eslARG_INT,    "120", NULL, "n>=120",NULL,  NULL, "--notextw",      "set max width of ASCII text output lines",                      2 },
-  /* Control of scoring system */
-  { "--popen",      eslARG_REAL,       "0.02", NULL, "0<=x<0.5",NULL,  NULL,  NULL,          "gap open probability",                                         3 },
-  { "--pextend",    eslARG_REAL,        "0.4", NULL, "0<=x<1",  NULL,  NULL,  NULL,          "gap extend probability",                                       3 },
 
   /* Control of reporting thresholds */
   { "-E",           eslARG_REAL,  "10.0", NULL, "x>0",   NULL,  NULL,  REPOPTS,         "report models <= this E-value threshold in output",             4 },
@@ -85,17 +80,16 @@ static ESL_OPTIONS options[] = {
   /* Control of acceleration pipeline */
   { "--max",        eslARG_NONE,   FALSE, NULL, NULL,    NULL,  NULL, "--F1,--F2,--F3", "Turn all heuristic filters off (less speed, more power)",       7 },
   { "--F1",         eslARG_REAL,  "0.02", NULL, NULL,    NULL,  NULL, "--max",          "MSV threshold: promote hits w/ P <= F1",                        7 },
-  { "--F2",         eslARG_REAL,  "1e-3", NULL, NULL,    NULL,  NULL, "--max",          "Vit threshold: promote hits w/ P <= F2",                        7 },
-  { "--F3",         eslARG_REAL,  "1e-5", NULL, NULL,    NULL,  NULL, "--max",          "Fwd threshold: promote hits w/ P <= F3",                        7 },
+  { "--F2",         eslARG_REAL,  "3e-3", NULL, NULL,    NULL,  NULL, "--max",          "Vit threshold: promote hits w/ P <= F2",                        7 },
+  { "--F3",         eslARG_REAL,  "3e-5", NULL, NULL,    NULL,  NULL, "--max",          "Fwd threshold: promote hits w/ P <= F3",                        7 },
   { "--nobias",     eslARG_NONE,    NULL, NULL, NULL,    NULL,  NULL, "--max",          "turn off composition bias filter",                              7 },
   { "--B1",         eslARG_INT,         "110", NULL, NULL,    NULL,  NULL, "--max,--nobias", "window length for biased-composition modifier (MSV)",          7 },
   { "--B2",         eslARG_INT,         "240", NULL, NULL,    NULL,  NULL, "--max,--nobias", "window length for biased-composition modifier (Vit)",          7 },
   { "--B3",         eslARG_INT,        "1000", NULL, NULL,    NULL,  NULL, "--max,--nobias", "window length for biased-composition modifier (Fwd)",          7 },
 
   /* Other options */
-  { "--qformat",    eslARG_STRING,  NULL, NULL, NULL,    NULL,  NULL,  NULL,             "assert input <seqfile> is in format <s>: no autodetection",     12 },
+  { "--qformat",    eslARG_STRING,  NULL, NULL, NULL,    NULL,  NULL,  NULL,             "assert input <seqfile> is in format <s>",                      12 },
   { "--nonull2",    eslARG_NONE,    NULL, NULL, NULL,    NULL,  NULL,  NULL,             "turn off biased composition score corrections",                12 },
-  { "--usenull3",   eslARG_NONE,    NULL, NULL, NULL,    NULL,  NULL,  "--nonull2",      "also use null3 for biased composition score corrections",       12 },
   { "-Z",           eslARG_REAL,   FALSE, NULL, "x>0",   NULL,  NULL,  NULL,             "set # of comparisons done, for E-value calculation",           12 },
   { "--seed",       eslARG_INT,    "42",  NULL, "n>=0",  NULL,  NULL,  NULL,             "set RNG seed to <n> (if 0: one-time arbitrary seed)",          12 },
   { "--w_beta",     eslARG_REAL,    NULL, NULL, NULL,    NULL,  NULL,           NULL,    "tail mass at which window length is determined",                12 },
@@ -227,16 +221,12 @@ output_header(FILE *ofp, ESL_GETOPTS *go, char *hmmfile, char *seqfile)
   if (esl_opt_IsUsed(go, "-o")          && fprintf(ofp, "# output directed to file:         %s\n",            esl_opt_GetString(go, "-o"))          < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (esl_opt_IsUsed(go, "--tblout")    && fprintf(ofp, "# per-seq hits tabular output:     %s\n",            esl_opt_GetString(go, "--tblout"))    < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (esl_opt_IsUsed(go, "--dfamtblout")    && fprintf(ofp, "# hits output in Dfam format:      %s\n",            esl_opt_GetString(go, "--dfamtblout")) < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
-  if (esl_opt_IsUsed(go, "--longinsertout") && fprintf(ofp, "# long inserts output:             %s\n",            esl_opt_GetString(go, "--longinsertout")) < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
-  if (esl_opt_IsUsed(go, "--insertlength")  && fprintf(ofp, "# long inserts minimum length:     %d\n",            esl_opt_GetInteger(go, "--insertlength")) < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
-  if (esl_opt_IsUsed(go, "--aliscoresout")  && fprintf(ofp, "# alignment scores output:         %s\n",            esl_opt_GetString(go, "--longinsertout")) < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
+  if (esl_opt_IsUsed(go, "--aliscoresout")  && fprintf(ofp, "# alignment scores output:         %s\n",            esl_opt_GetString(go, "--aliscoresout")) < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
 
   if (esl_opt_IsUsed(go, "--acc")       && fprintf(ofp, "# prefer accessions over names:    yes\n")                                                 < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (esl_opt_IsUsed(go, "--noali")     && fprintf(ofp, "# show alignments in output:       no\n")                                                  < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (esl_opt_IsUsed(go, "--notextw")   && fprintf(ofp, "# max ASCII text line length:      unlimited\n")                                           < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (esl_opt_IsUsed(go, "--textw")     && fprintf(ofp, "# max ASCII text line length:      %d\n",            esl_opt_GetInteger(go, "--textw"))    < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
-  if (esl_opt_IsUsed(go, "--popen")      && fprintf(ofp, "# gap open probability:            %f\n",             esl_opt_GetReal   (go, "--popen"))    < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
-  if (esl_opt_IsUsed(go, "--pextend")    && fprintf(ofp, "# gap extend probability:          %f\n",             esl_opt_GetReal   (go, "--pextend"))  < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
 
   if (esl_opt_IsUsed(go, "-E")          && fprintf(ofp, "# profile reporting threshold:     E-value <= %g\n", esl_opt_GetReal(go, "-E"))            < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (esl_opt_IsUsed(go, "-T")          && fprintf(ofp, "# profile reporting threshold:     score >= %g\n",   esl_opt_GetReal(go, "-T"))            < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
@@ -256,7 +246,6 @@ output_header(FILE *ofp, ESL_GETOPTS *go, char *hmmfile, char *seqfile)
 
 
   if (esl_opt_IsUsed(go, "--nonull2")   && fprintf(ofp, "# null2 bias corrections:          off\n")                                                 < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
-  if (esl_opt_IsUsed(go, "--usenull3")   && fprintf(ofp, "# null3 bias corrections:          on\n")                                                    < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
 
   if (esl_opt_IsUsed(go, "--toponly")    && fprintf(ofp, "# search only top strand:          on\n")                                                  < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
   if (esl_opt_IsUsed(go, "--bottomonly") && fprintf(ofp, "# search only bottom strand:       on\n")                                                  < 0) ESL_EXCEPTION_SYS(eslEWRITE, "write failed");
@@ -317,7 +306,6 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
   FILE            *ofp      = stdout;	         /* output file for results (default stdout)        */
   FILE            *tblfp    = NULL;		 /* output stream for tabular per-seq (--tblout)    */
   FILE            *dfamtblfp    = NULL;            /* output stream for tabular Dfam format (--dfamtblout)    */
-  FILE            *inserttblfp  = NULL;            /* output stream for table of long inserts (--longinsertout)    */
   FILE            *aliscoresfp  = NULL;            /* output stream for alignment scores (--aliscoresout)    */
 
 //  P7_HMM          *hmm        = NULL;              /* one HMM query                                   */
@@ -405,7 +393,6 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
   if (esl_opt_IsOn(go, "-o"))          { if ((ofp      = fopen(esl_opt_GetString(go, "-o"),          "w")) == NULL)  esl_fatal("Failed to open output file %s for writing\n",                 esl_opt_GetString(go, "-o")); }
   if (esl_opt_IsOn(go, "--tblout"))    { if ((tblfp    = fopen(esl_opt_GetString(go, "--tblout"),    "w")) == NULL)  esl_fatal("Failed to open tabular per-seq output file %s for writing\n", esl_opt_GetString(go, "--tblfp")); }
   if (esl_opt_IsOn(go, "--dfamtblout"))    { if ((dfamtblfp    = fopen(esl_opt_GetString(go, "--dfamtblout"),"w"))    == NULL)  esl_fatal("Failed to open tabular dfam output file %s for writing\n", esl_opt_GetString(go, "--dfamtblout")); }
-  if (esl_opt_IsOn(go, "--longinsertout")) { if ((inserttblfp  = fopen(esl_opt_GetString(go, "--longinsertout"),"w")) == NULL)  esl_fatal("Failed to open long-insert output file %s for writing\n", esl_opt_GetString(go, "--longinsertout")); }
   if (esl_opt_IsOn(go, "--aliscoresout"))  { if ((aliscoresfp  = fopen(esl_opt_GetString(go, "--aliscoresout"),"w")) == NULL)  esl_fatal("Failed to open alignment scores output file %s for writing\n", esl_opt_GetString(go, "--aliscoresout")); }
  
   output_header(ofp, go, cfg->hmmfile, cfg->seqfile);
@@ -428,7 +415,6 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
   for (i = 0; i < infocnt; ++i)
     {
       info[i].bg    = p7_bg_Create(abc);
-      info[i].bg->use_null3  = esl_opt_IsUsed(go, "--usenull3");
 #ifdef HMMER_THREADS
       info[i].queue = queue;
 #endif
@@ -450,7 +436,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
   {
       if (sstatus == eslEMEM)                 p7_Fail("Memory allocation error reading sequence file\n", status);
       if (sstatus == eslEINCONCEIVABLE)       p7_Fail("Unexpected error %d reading sequence file\n", status);
-      if (qsq->L > NHMMER_MAX_RESIDUE_COUNT)  p7_Fail("Input sequence %s in file %s exceeds maximum length of %d bases.\n",  qsq->name, cfg->seqfile, NHMMER_MAX_RESIDUE_COUNT);
+     // if (qsq->L > NHMMER_MAX_RESIDUE_COUNT)  p7_Fail("Input sequence %s in file %s exceeds maximum length of %d bases.\n",  qsq->name, cfg->seqfile, NHMMER_MAX_RESIDUE_COUNT);
 
       nquery++;
       esl_stopwatch_Start(w);	                          
@@ -524,6 +510,7 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
         p7_tophits_Destroy(info[i].th);
       }
 
+
       /* modify e-value to account for number of models */
       for (i = 0; i < info->th->N ; i++)
       {
@@ -558,7 +545,6 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
 
       if (tblfp)     p7_tophits_TabularTargets(tblfp,    qsq->name, qsq->acc, info->th, info->pli, (nquery == 1));
       if (dfamtblfp) p7_tophits_TabularXfam(dfamtblfp,   qsq->name, NULL, info->th, info->pli);
-      if (inserttblfp) p7_tophits_LongInserts(inserttblfp, qsq->name, qsq->acc, info->th, info->pli, esl_opt_GetInteger(go, "--insertlength") );
       if (aliscoresfp) p7_tophits_AliScores(aliscoresfp, qsq->name, info->th );
 
 
@@ -612,13 +598,18 @@ serial_master(ESL_GETOPTS *go, struct cfg_s *cfg)
   if (ofp != stdout) fclose(ofp);
   if (tblfp)         fclose(tblfp);
   if (dfamtblfp)     fclose(dfamtblfp);
-  if (inserttblfp)   fclose(inserttblfp);
   if (aliscoresfp)   fclose(aliscoresfp);
 
   return eslOK;
 
  ERROR:
-  return status;
+
+ if (ofp != stdout) fclose(ofp);
+ if (tblfp)         fclose(tblfp);
+ if (dfamtblfp)     fclose(dfamtblfp);
+ if (aliscoresfp)   fclose(aliscoresfp);
+
+ return status;
 }
 
 
@@ -632,7 +623,6 @@ serial_loop(WORKER_INFO *info, P7_HMMFILE *hfp)
   P7_OPROFILE   *om        = NULL;
   P7_SCOREDATA  *scoredata = NULL;   /* hmm-specific data used by nhmmer */
   ESL_ALPHABET  *abc = NULL;
-  P7_DOMAIN *dcl;
 
 #ifdef eslAUGMENT_ALPHABET
   ESL_SQ        *sq_revcmp = NULL;
@@ -661,28 +651,15 @@ serial_loop(WORKER_INFO *info, P7_HMMFILE *hfp)
       //reverse complement
       if (info->pli->strand != p7_STRAND_TOPONLY && info->qsq->abc->complement != NULL )
       {
-        p7_Pipeline_LongTarget(info->pli, om, scoredata, info->bg, sq_revcmp, info->th, 0);
+        p7_Pipeline_LongTarget(info->pli, om, scoredata, info->bg, info->th, 0, sq_revcmp, p7_COMPLEMENT, NULL, NULL, NULL);
         p7_pipeline_Reuse(info->pli); // prepare for next search
-
         seq_len = info->qsq->n;
-        for (i = prev_hit_cnt; i < info->th->N ; i++)
-        {
-          dcl = info->th->unsrt[i].dcl;
-          // modify hit positions to account for the position of the window in the full sequence
-          dcl->ienv = seq_len - dcl->ienv + 1;
-          dcl->jenv = seq_len - dcl->jenv + 1;
-          dcl->iali = seq_len - dcl->iali + 1;
-          dcl->jali = seq_len - dcl->jali + 1;
-          dcl->ad->sqfrom = seq_len - dcl->ad->sqfrom + 1;
-          dcl->ad->sqto = seq_len - dcl->ad->sqto + 1;
-        }
-
       }
 #endif
 
 
       if (info->pli->strand != p7_STRAND_BOTTOMONLY) {
-        p7_Pipeline_LongTarget(info->pli, om, scoredata, info->bg, info->qsq, info->th, 0);
+        p7_Pipeline_LongTarget(info->pli, om, scoredata, info->bg, info->th, 0, info->qsq, p7_NOCOMPLEMENT, NULL, NULL, NULL);
         p7_pipeline_Reuse(info->pli);
         seq_len += info->qsq->n;
       }
@@ -692,7 +669,7 @@ serial_loop(WORKER_INFO *info, P7_HMMFILE *hfp)
         info->th->unsrt[i].lnP         += log((float)seq_len / (float)om->max_length);
         info->th->unsrt[i].dcl[0].lnP   = info->th->unsrt[i].lnP;
         info->th->unsrt[i].sortkey      = -1.0 * info->th->unsrt[i].lnP;
-        info->th->unsrt[i].dcl[0].ad->L =  info->qsq->n;
+        info->th->unsrt[i].dcl[0].ad->L =  om->M;
       }
 
       prev_hit_cnt = info->th->N;
@@ -772,7 +749,6 @@ pipeline_thread(void *arg)
   P7_OPROFILE   *om        = NULL;
   P7_SCOREDATA  *scoredata = NULL;   /* hmm-specific data used by nhmmer */
 
-  P7_DOMAIN *dcl;
   int seq_len = 0;
   int prev_hit_cnt = 0;
 
@@ -823,26 +799,13 @@ pipeline_thread(void *arg)
         //reverse complement
         if (info->pli->strand != p7_STRAND_TOPONLY && info->qsq->abc->complement != NULL )
         {
-          p7_Pipeline_LongTarget(info->pli, om, scoredata, info->bg, sq_revcmp, info->th, 0);
+          p7_Pipeline_LongTarget(info->pli, om, scoredata, info->bg, info->th, 0, sq_revcmp, p7_COMPLEMENT, NULL, NULL, NULL);
           p7_pipeline_Reuse(info->pli); // prepare for next search
-
           seq_len = info->qsq->n;
-          for (j = prev_hit_cnt; j < info->th->N ; j++)
-          {
-            dcl = info->th->unsrt[j].dcl;
-            // modify hit positions to account for the position of the window in the full sequence
-            dcl->ienv = seq_len - dcl->ienv + 1;
-            dcl->jenv = seq_len - dcl->jenv + 1;
-            dcl->iali = seq_len - dcl->iali + 1;
-            dcl->jali = seq_len - dcl->jali + 1;
-            dcl->ad->sqfrom = seq_len - dcl->ad->sqfrom + 1;
-            dcl->ad->sqto = seq_len - dcl->ad->sqto + 1;
-          }
-
         }
 #endif
         if (info->pli->strand != p7_STRAND_BOTTOMONLY) {
-          p7_Pipeline_LongTarget(info->pli, om, scoredata, info->bg, info->qsq, info->th, 0);
+          p7_Pipeline_LongTarget(info->pli, om, scoredata, info->bg, info->th, 0, info->qsq, p7_NOCOMPLEMENT, NULL, NULL, NULL);
           p7_pipeline_Reuse(info->pli);
           seq_len += info->qsq->n;
         }
@@ -852,12 +815,12 @@ pipeline_thread(void *arg)
           info->th->unsrt[j].lnP         += log((float)seq_len / (float)om->max_length);
           info->th->unsrt[j].dcl[0].lnP   = info->th->unsrt[j].lnP;
           info->th->unsrt[j].sortkey      = -1.0 * info->th->unsrt[j].lnP;
-          info->th->unsrt[j].dcl[0].ad->L =  info->qsq->n;
+          info->th->unsrt[j].dcl[0].ad->L = om->M;
         }
 
         prev_hit_cnt = info->th->N;
         p7_hmm_ScoreDataDestroy(scoredata);
-
+        p7_oprofile_Destroy(om);
         block->list[i] = NULL;
       }
 

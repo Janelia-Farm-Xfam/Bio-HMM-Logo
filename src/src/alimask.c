@@ -57,13 +57,14 @@ static ESL_OPTIONS options[] = {
 /* mask ranges */
   { "--modelrange", eslARG_STRING, NULL, NULL, NULL,  NULL,    NULL,     RANGEOPTS,  "range(s) for mask(s) in model coordinates", 5 },
   { "--alirange",   eslARG_STRING, NULL, NULL, NULL,  NULL,    NULL,     RANGEOPTS,  "range(s) for mask(s) in alignment coordinates", 5 },
-  { "--apendmask",    eslARG_NONE, NULL,  NULL, NULL, NULL,  WGTOPTS,         NULL,  "add to existing mask (default ignores to existing mask)",    5 },
+  { "--apendmask",    eslARG_NONE, NULL, NULL, NULL,  NULL,  WGTOPTS,         NULL,  "add to existing mask (default ignores to existing mask)",    5 },
   { "--model2ali",  eslARG_STRING, NULL, NULL, NULL,  NULL,    NULL,     RANGEOPTS,  "print model ranges corresponding to input alignment ranges", 5 },
   { "--ali2model",  eslARG_STRING, NULL, NULL, NULL,  NULL,    NULL,     RANGEOPTS,  "print alignment ranges corresponding to input model ranges", 5 },
 
 /* Other options */
-  { "--informat", eslARG_STRING, NULL, NULL, NULL,      NULL,      NULL,    NULL, "assert input alifile is in format <s> (no autodetect)", 8 },
-  { "--seed",     eslARG_INT,   "42", NULL, "n>=0",     NULL,      NULL,    NULL, "set RNG seed to <n> (if 0: one-time arbitrary seed)",   8 },
+  { "--informat", eslARG_STRING,      NULL,    NULL, NULL,   NULL,   NULL,  NULL, "assert input alifile is in format <s> (no autodetect)", 8 },
+  { "--outformat", eslARG_STRING, "Stockholm", NULL, NULL,   NULL,   NULL,  NULL, "output alignment in format <s>",                                    2 },
+  { "--seed",     eslARG_INT,        "42",     NULL, "n>=0", NULL,   NULL,  NULL, "set RNG seed to <n> (if 0: one-time arbitrary seed)",   8 },
   {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 
@@ -177,25 +178,6 @@ output_header(const ESL_GETOPTS *go, FILE *ofp, char *alifile, char *postmsafile
   return eslOK;
 }
 
-/* lifted from esl-sfetch */
-static int
-parse_coord_string(const char *cstring, uint32_t *ret_start, uint32_t *ret_end)
-{
-  ESL_REGEXP *re = esl_regexp_Create();
-  char        tok1[32];
-  char        tok2[32];
-
-  if (esl_regexp_Match(re, "^(\\d+)\\D+(\\d*)$", cstring) != eslOK) esl_fatal("-c takes arg of subseq coords <from>..<to>; %s not recognized", cstring);
-  if (esl_regexp_SubmatchCopy(re, 1, tok1, 32)            != eslOK) esl_fatal("Failed to find <from> coord in %s", cstring);
-  if (esl_regexp_SubmatchCopy(re, 2, tok2, 32)            != eslOK) esl_fatal("Failed to find <to> coord in %s",   cstring);
-
-  *ret_start = atol(tok1);
-  *ret_end   = (tok2[0] == '\0') ? 0 : atol(tok2);
-
-  esl_regexp_Destroy(re);
-  return eslOK;
-}
-
 
 int
 main(int argc, char **argv)
@@ -213,7 +195,9 @@ main(int argc, char **argv)
 
   char         *alifile;  /* name of the alignment file we're building HMMs from  */
   ESLX_MSAFILE *afp         = NULL;            /* open alifile  */
-  int           fmt;    /* format code for alifile */
+  int           infmt       = eslMSAFILE_UNKNOWN;    /* autodetect alignment format by default. */
+  int           outfmt      = eslMSAFILE_STOCKHOLM;
+
 
   char         *postmsafile;  /* optional file to resave annotated, modified MSAs to  */
   FILE         *postmsafp = NULL;  /* open <postmsafile>, or NULL */
@@ -232,7 +216,6 @@ main(int argc, char **argv)
 
   /* Set processor specific flags */
   impl_Init();
-
   alifile     = NULL;
   postmsafile = NULL;
 
@@ -246,14 +229,19 @@ main(int argc, char **argv)
    * Fields used by workers are set up in mpi_worker()
    */
   ofp         = NULL;
-  fmt         = eslMSAFILE_UNKNOWN;    /* autodetect alignment format by default. */
+  infmt         = eslMSAFILE_UNKNOWN;
   afp         = NULL;
   abc         = NULL;
 
   if (esl_opt_IsOn(go, "--informat")) {
-    fmt = eslx_msafile_EncodeFormat(esl_opt_GetString(go, "--informat"));
-    if (fmt == eslMSAFILE_UNKNOWN) p7_Fail("%s is not a recognized input sequence file format\n", esl_opt_GetString(go, "--informat"));
+    infmt = eslx_msafile_EncodeFormat(esl_opt_GetString(go, "--informat"));
+    if (infmt == eslMSAFILE_UNKNOWN) p7_Fail("%s is not a recognized input sequence file format\n", esl_opt_GetString(go, "--informat"));
   }
+
+  /* Determine output alignment file format */
+  outfmt = eslx_msafile_EncodeFormat(esl_opt_GetString(go, "--outformat"));
+  if (outfmt == eslMSAFILE_UNKNOWN)    p7_Fail(argv[0], "%s is not a recognized output MSA file format\n", esl_opt_GetString(go, "--outformat"));
+
 
 
   /* Parse the ranges */
@@ -271,7 +259,10 @@ main(int argc, char **argv)
   }
 
   while ( (status = esl_strtok(&rangestr, ",", &range) ) == eslOK) {
-    parse_coord_string(range, mask_starts + mask_range_cnt, mask_ends + mask_range_cnt );
+    status = esl_regexp_ParseCoordString(range, mask_starts + mask_range_cnt, mask_ends + mask_range_cnt );
+    if (status == eslESYNTAX) esl_fatal("range flags take coords <from>..<to>; %s not recognized", range);
+    if (status == eslFAIL)    esl_fatal("Failed to find <from> or <to> coord in %s", range);
+
     mask_range_cnt++;
   }
 
@@ -293,7 +284,7 @@ main(int argc, char **argv)
   else if (esl_opt_GetBoolean(go, "--rna"))     abc = esl_alphabet_Create(eslRNA);
   else                                          abc = NULL;
   
-  status = eslx_msafile_Open(&abc, alifile, NULL, fmt, NULL, &afp);
+  status = eslx_msafile_Open(&abc, alifile, NULL, infmt, NULL, &afp);
   if (status != eslOK) eslx_msafile_OpenFailure(afp, status);
 
   if (esl_opt_IsUsed(go, "--alirange") || esl_opt_IsUsed(go, "--modelrange") ) {
@@ -420,7 +411,7 @@ main(int argc, char **argv)
       for (j=mask_starts[i]; j<=mask_ends[i]; j++)
         msa->mm[j-1] = 'm';
 
-    if ((status = eslx_msafile_Write(postmsafp, msa, eslMSAFILE_STOCKHOLM))  != eslOK) ESL_XEXCEPTION_SYS(eslEWRITE, "write failed");
+    if ((status = eslx_msafile_Write(postmsafp, msa, outfmt))  != eslOK) ESL_XEXCEPTION_SYS(eslEWRITE, "write failed");
   }
 
   esl_stopwatch_Stop(w);

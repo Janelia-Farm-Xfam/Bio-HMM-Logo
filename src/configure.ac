@@ -37,7 +37,7 @@
 
 # Autoconf 2.61 has a bug in AC_FUNC_FSEEKO; don't use it.
 AC_PREREQ(2.63)
-AC_INIT(HMMER, 3.1dev, eddys@janelia.hhmi.org, hmmer)
+AC_INIT(HMMER, 3.1b1, eddys@janelia.hhmi.org, hmmer)
 AC_MSG_NOTICE([Configuring HMMER for your system.])
 
 # remember if the user is overriding CFLAGS
@@ -68,16 +68,16 @@ fi
 # to use HMMER as a library inside other packages, with no name clashes.
 ################################################################
 
-HMMER_DATE="April 2012"
-HMMER_COPYRIGHT="Copyright (C) 2011 Howard Hughes Medical Institute."
+HMMER_DATE="May 2013"
+HMMER_COPYRIGHT="Copyright (C) 2013 Howard Hughes Medical Institute."
 HMMER_LICENSE="Freely distributed under the GNU General Public License (GPLv3)."
 HMMER_VERSION=$PACKAGE_VERSION
 HMMER_URL="http://hmmer.org/"
 HMMER_ESLDIR="easel"
 HMMER_SADIR="libdivsufsort"
 
-EASEL_DATE="April 2012"
-EASEL_COPYRIGHT="Copyright (C) 2010 Howard Hughes Medical Institute."
+EASEL_DATE="May 2013"
+EASEL_COPYRIGHT="Copyright (C) 2013 Howard Hughes Medical Institute."
 EASEL_LICENSE="Freely distributed under the Janelia Farm Software License."
 EASEL_VERSION="h$PACKAGE_VERSION"
 EASEL_URL="http://bioeasel.org/"
@@ -585,7 +585,26 @@ AS_IF([test "x$with_gsl" != xno],
 
 # Checks for headers
 #
-AC_CHECK_HEADERS([sys/types.h sys/sysctl.h unistd.h stdint.h inttypes.h endian.h])
+# Defines HAVE_SYS_TYPES_H, HAVE_STDINT_H, etc.
+AC_CHECK_HEADERS([ \
+  endian.h\
+  inttypes.h\
+  stdint.h\
+  unistd.h\
+  sys/types.h\
+  netinet/in.h
+]) 
+
+# Check for sysctl.h separately.  On OpenBSD, it requires
+# <sys/param.h> and autoconf needs special logic to deal w. this as
+# follows.
+AC_CHECK_HEADERS([sys/param.h])
+AC_CHECK_HEADERS([sys/sysctl.h], [], [],
+[[#ifdef HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+]])
+
 
 # altivec.h requires the simd cflags
 # For reasons I don't understand, this needs to come after any other CHECK_HEADERS().
@@ -642,7 +661,9 @@ fi
 
 AC_CONFIG_FILES([documentation/Makefile])
 AC_CONFIG_FILES([documentation/man/Makefile])
-AC_CONFIG_FILES([documentation/userguide/Makefile])
+if test -d "documentation/userguide"; then 
+  AC_CONFIG_FILES([documentation/userguide/Makefile])
+fi  
 AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([testsuite/Makefile])
 AC_CONFIG_FILES([profmark/Makefile])
@@ -652,10 +673,11 @@ AC_CONFIG_HEADERS([easel/esl_config.h])
 AC_CONFIG_HEADERS([libdivsufsort/divsufsort.h])
 AC_CONFIG_FILES([easel/miniapps/Makefile])
 AC_CONFIG_FILES([easel/testsuite/Makefile])
-AC_CONFIG_FILES([easel/documentation/Makefile])
+if test -d "easel/documentation"; then
+  AC_CONFIG_FILES([easel/documentation/Makefile])
+fi    
 AC_CONFIG_FILES([easel/Makefile])
 AC_CONFIG_FILES([libdivsufsort/Makefile])
-
 
 # the following incantation establishes a symlink of
 # src/impl_{whatever} to src/impl in the *build* directory.

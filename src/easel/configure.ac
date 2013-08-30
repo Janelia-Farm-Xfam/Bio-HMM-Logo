@@ -62,7 +62,8 @@
 #     EASEL_VERSION    e.g. "1.9a"
 #
 AC_PREREQ(2.60)
-AC_INIT(Easel, 0.1.snap20080611, eddys@janelia.hhmi.org, easel)
+#AC_INIT(Easel, 0.1.snap20080611, eddys@janelia.hhmi.org, easel)
+AC_INIT(Easel, 0.2.snap20130225, eddys@janelia.hhmi.org, easel)
 AC_MSG_NOTICE([Configuring the Easel library for your system.])
 
 # remember if the user is overriding CFLAGS
@@ -74,7 +75,7 @@ fi
 # 3. Info on the package
 ################################################################
 
-EASEL_DATE="June 2008"
+EASEL_DATE="February 2013"
 EASEL_COPYRIGHT="Copyright (C) 2008 Howard Hughes Medical Institute"
 EASEL_LICENSE="Freely distributed under the Janelia Farm Software License."
 EASEL_VERSION=$PACKAGE_VERSION
@@ -388,7 +389,37 @@ AS_IF([test "x$with_gsl" != xno],
 
 # 6. Checks for header files.
 #    Defines preprocessor symbols like HAVE_UNISTD_H
-AC_CHECK_HEADERS([sys/types.h sys/sysctl.h unistd.h strings.h stdint.h inttypes.h endian.h])
+AC_CHECK_HEADERS([\
+  endian.h \
+  inttypes.h \
+  stdint.h \
+  unistd.h \
+  sys/types.h \
+  strings.h \
+])
+
+# Check for sysctl.h separately.  On OpenBSD, it requires
+# <sys/param.h> and autoconf needs special logic to deal w. this as
+# follows.
+AC_CHECK_HEADERS([sys/param.h])
+AC_CHECK_HEADERS([sys/sysctl.h], [], [], 
+[[#ifdef HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+]])
+
+# Vector-specific headers. 
+# Separated, because we may want to implement
+# other vector languages besides SSE
+# For SSE:
+#  xmmintrin.h = SSE
+#  emmintrin.h = SSE2
+#  pmmintrin.h = SSE3
+AC_CHECK_HEADERS([\
+  emmintrin.h\
+  pmmintrin.h\
+  xmmintrin.h
+])
 
 # altivec.h requires the simd cflags
 # For reasons I don't understand, this needs to come after any other CHECK_HEADERS().

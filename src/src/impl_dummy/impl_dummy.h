@@ -47,36 +47,9 @@ p7_oprofile_FGetEmission(const P7_OPROFILE *om, int k, int x)
 
 typedef P7_GMX P7_OMX;
 
-/*****************************************************************
- * 3. FM-index
- *****************************************************************/
-
-/* Effectively global variables, to be initialized once in fm_initConfig(),
- * then passed around among threads to avoid recomputing them
- */
-typedef struct {
-  /*suffix-array mask and offset values*/
-  int maskSA;
-  int shiftSA;
-
-  /*counter, to compute FM-index speed*/
-  int occCallCnt;
-
-  /*bounding cutoffs*/
-  int max_depth;
-  int neg_len_limit;
-  int consec_pos_req;
-  float score_ratio_req;
-  int msv_length;
-  float max_scthreshFM;
-
-  /*pointer to FM-index metadata*/
-  FM_METADATA *meta;
-
-} FM_CFG;
 
 /*****************************************************************
- * 4. Declarations of the external API.
+ * 3. Declarations of the external API.
  *****************************************************************/
 
 /* p7_omx.c */
@@ -100,6 +73,7 @@ extern void         p7_oprofile_Destroy(P7_OPROFILE *om);
 extern size_t       p7_oprofile_Sizeof(P7_OPROFILE *om);
 extern P7_OPROFILE *p7_oprofile_Copy(P7_OPROFILE *om);
 extern P7_OPROFILE *p7_oprofile_Clone(P7_OPROFILE *om);
+extern int          p7_oprofile_UpdateFwdEmissionScores(P7_OPROFILE *om, P7_BG *bg, float *fwd_emissions, float *sc_arr);
 
 extern int          p7_oprofile_Convert(const P7_PROFILE *gm, P7_OPROFILE *om);
 extern int          p7_oprofile_ReconfigLength    (P7_OPROFILE *om, int L);
@@ -116,7 +90,7 @@ extern int          p7_profile_SameAsMF(const P7_OPROFILE *om, P7_PROFILE *gm);
 extern int          p7_profile_SameAsVF(const P7_OPROFILE *om, P7_PROFILE *gm);
 
 extern int          p7_oprofile_GetFwdTransitionArray(const P7_OPROFILE *om, int type, float *arr );
-extern int          p7_oprofile_GetMSVEmissionScoreArray(const P7_OPROFILE *om, uint8_t *arr );
+extern int          p7_oprofile_GetSSVEmissionScoreArray(const P7_OPROFILE *om, uint8_t *arr );
 extern int          p7_oprofile_GetFwdEmissionScoreArray(const P7_OPROFILE *om, float *arr );
 extern int          p7_oprofile_GetFwdEmissionArray(const P7_OPROFILE *om, P7_BG *bg, float *arr );
 
@@ -141,7 +115,7 @@ extern void p7_oprofile_DestroyBlock(P7_OM_BLOCK *block);
 
 /* msvfilter.c */
 extern int p7_MSVFilter    (const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_OMX *ox, float *ret_sc);
-extern int p7_MSVFilter_longtarget(const ESL_DSQ *dsq, int L, P7_OPROFILE *om, P7_OMX *ox, const P7_SCOREDATA *msvdata, P7_BG *bg, double P, P7_HMM_WINDOWLIST *windowlist);
+extern int p7_SSVFilter_longtarget(const ESL_DSQ *dsq, int L, P7_OPROFILE *om, P7_OMX *ox, const P7_SCOREDATA *msvdata, P7_BG *bg, double P, P7_HMM_WINDOWLIST *windowlist);
 
 /* null2.c */
 extern int p7_Null2_ByExpectation(const P7_OPROFILE *om, P7_OMX *pp, float *null2);
@@ -165,14 +139,8 @@ extern int p7_ViterbiFilter_longtarget(const ESL_DSQ *dsq, int L, const P7_OPROF
 extern int p7_ViterbiScore (const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7_OMX *ox, float *ret_sc);
 
 
-/*fm.c */
-extern int fm_initConfig      (FM_CFG *cfg, ESL_GETOPTS *go );
-extern int fm_destroyConfig   (FM_CFG *cfg );
-extern int fm_getOccCount     (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c);
-extern int fm_getOccCountLT   (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c, uint32_t *cnteq, uint32_t *cntlt);
-
 /*****************************************************************
- * 5. Implementation specific initialization
+ * 4. Implementation specific initialization
  *****************************************************************/
 static inline void
 impl_Init(void)

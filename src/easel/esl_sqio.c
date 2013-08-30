@@ -103,7 +103,7 @@ esl_sqfile_Open(const char *filename, int format, const char *env, ESL_SQFILE **
  *            
  *            Only normal sequence files can be positioned to a
  *            nonzero offset. If <sqfp> corresponds to a standard
- *            input stream or gunzip stream, it may not be
+ *            input stream or gzip -dc stream, it may not be
  *            repositioned. If <sqfp> corresponds to a multiple
  *            sequence alignment file, the only legal <offset>
  *            is 0, to rewind the file to the beginning and 
@@ -1037,9 +1037,9 @@ esl_sqio_ReadWindow(ESL_SQFILE *sqfp, int C, int W, ESL_SQ *sq)
  *            <eslEINCONCEIVABLE> on internal error.
  */
 int
-esl_sqio_ReadBlock(ESL_SQFILE *sqfp, ESL_SQ_BLOCK *sqBlock, int max_residues, int long_target)
+esl_sqio_ReadBlock(ESL_SQFILE *sqfp, ESL_SQ_BLOCK *sqBlock, int max_residues, int max_sequences, int long_target)
 {
-  return sqfp->read_block(sqfp, sqBlock, max_residues, long_target);
+  return sqfp->read_block(sqfp, sqBlock, max_residues, max_sequences, long_target);
 }
 
 /* Function:  esl_sqio_Echo()
@@ -1333,6 +1333,7 @@ esl_sqio_Write(FILE *fp, ESL_SQ *s, int format, int update)
 
   switch (format) {
   case eslSQFILE_FASTA:   
+  case eslSQFILE_HMMPGMD:
     status = esl_sqascii_WriteFasta(fp, s, update); 
     break;
   default: 

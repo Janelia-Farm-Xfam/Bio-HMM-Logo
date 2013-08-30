@@ -889,7 +889,7 @@ esl_sq_Textize(ESL_SQ *sq)
  *
  *            The routine is tested on large sequence databases to
  *            make sure there are zero false positive classifications
- *            on known sequences. See <esl_abc_GuessAlphabet() for
+ *            on known sequences. See <esl_abc_GuessAlphabet()> for
  *            details of these tests, and crossreferences.
  *
  * Returns:   <eslOK> on success, and <*ret_type> is set to
@@ -1597,24 +1597,52 @@ esl_sq_Checksum(const ESL_SQ *sq, uint32_t *ret_checksum)
 
 
 
-/* Function:  esl_sq_GetFrequencies()
- * Synopsis:  compute character frequencies
+/* Function:  esl_sq_CountResidues()
+ * Synopsis:  compute character counts
  *
- * Purpose:   Given a sequence <dsq>, length <sq_len>, and alphabet <abc>,
- *            compute frequencies, and store in pre-allocated <f>
+ * Purpose:   Given an ESL\_SQ <sq>, compute counts of all observed
+ *            residues in the range between <start> and <start>+<L>-1. Note
+ *            that a text-mode sequence starts at 0, while a digital-mode
+ *            sequence starts at 1. Will count degeneracies as partial
+ *            observations of the K canonical residues. Gaps, missing data,
+ *            and not-a-residue characters will be ignored (so $\sum_x f[x]$ is
+ *            not necessarily == L!). The array <*f> needs to be allocated for
+ *            sq->abc->K values.
+ *
+ *            The vector is not zeroed out, allowing counts to be gathered from
+ *            a collection of ESL\_SQs.
+ *
+ * Returns:   <eslOK> on success, <eslERANGE> when start or L are
+ *            outside the range of the sequence.
  */
 int
-esl_sq_GetFrequencies(const ESL_DSQ *dsq, int sq_len, const ESL_ALPHABET *abc, float *f)
+esl_sq_CountResidues(const ESL_SQ *sq, int start, int L, float *f)
 {
-  int k;
-  esl_vec_FSet (f, abc->K, 0);
-  for (k=0 ; k < sq_len; k++) {
-    if(esl_abc_XIsGap(abc, dsq[k])) esl_exception(eslEINVAL, FALSE, __FILE__, __LINE__, "in p7_bg_SetFreqFromSequence(), res %d is a gap!%s\n", "");
-    esl_abc_FCount(abc, f, dsq[k], 1.);
+  int i;
+
+  if (sq->seq != NULL) {   /* text */
+    if (start<0 || start+L>sq->n)
+      return eslERANGE; //range out of sequence bounds
+
+    for (i=start ; i < start+L; i++) {
+      if(! esl_abc_CIsGap(sq->abc, sq->seq[i])) // ignore gap characters
+        esl_abc_FCount(sq->abc, f, sq->abc->inmap[(int) sq->seq[i]], 1.);
+    }
+#ifdef eslAUGMENT_ALPHABET
+  } else  { /* digital sequence; 0 is a sentinel       */
+    if (start<1 || start+L>sq->n+1)
+      return eslERANGE; //range out of sequence bounds
+
+    for (i=start ; i < start+L; i++) {
+      if(! esl_abc_XIsGap(sq->abc, sq->dsq[i])) // ignore gap characters
+        esl_abc_FCount(sq->abc, f, sq->dsq[i], 1.);
+    }
+#endif
   }
-  esl_vec_FNorm(f, abc->K);
+
   return eslOK;
 }
+
 
 
 /*----------------------  end, other functions -------------------*/
@@ -2396,6 +2424,54 @@ utest_ExtraResMarkups()
   esl_alphabet_Destroy(abc);
 } 
 
+/* test counting residues in a sq */
+static void
+utest_CountResidues()
+{
+  char         *msg  = "failure in utest_CountResidues()";
+  ESL_ALPHABET *abc  = esl_alphabet_Create(eslDNA);
+  char         *name = "seqname";
+  char         *acc  = "XX00001";
+  char         *desc = "test sequence description";
+  char         *seq  = "GGGAATTCCC";
+  char         *ss   = "xxxx...xxx";
+  ESL_SQ       *sq   = NULL;
+  float        *cnts = NULL;
+  int          status;
+
+  ESL_ALLOC(cnts, abc->Kp * sizeof(float));
+
+
+  if ((sq = esl_sq_CreateFrom(name, seq, desc, acc, ss))    == NULL)  esl_fatal(msg);
+  sq->abc = abc;
+  esl_vec_FSet (cnts, abc->K, 0);
+  esl_sq_CountResidues(sq, 0, sq->n, cnts);
+  if (cnts[0] != 2)  esl_fatal(msg);
+  if (cnts[1] != 3)  esl_fatal(msg);
+  if (cnts[2] != 3)  esl_fatal(msg);
+  if (cnts[3] != 2)  esl_fatal(msg);
+
+
+#ifdef eslAUGMENT_ALPHABET
+  esl_sq_Digitize(abc, sq);
+  esl_vec_FSet (cnts, abc->K, 0);
+  esl_sq_CountResidues(sq, 1, sq->n, cnts);
+  if (cnts[0] != 2)  esl_fatal(msg);
+  if (cnts[1] != 3)  esl_fatal(msg);
+  if (cnts[2] != 3)  esl_fatal(msg);
+  if (cnts[3] != 2)  esl_fatal(msg);
+  return;
+  esl_sq_Destroy(sq);
+#endif
+  return;
+
+
+ERROR:
+  esl_fatal(msg);
+  return;
+}
+
+
 #endif /* eslSQ_TESTDRIVE*/
 /*--------------------- end, unit tests -------------------------*/
 
@@ -2438,6 +2514,7 @@ main(int argc, char **argv)
   utest_Create();
   utest_Set(r);
   utest_Format(r);
+  utest_CountResidues();
 
 #ifdef eslAUGMENT_ALPHABET
   utest_CreateDigital();

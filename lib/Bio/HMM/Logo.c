@@ -53,11 +53,12 @@ ERROR:
 
 
 SV*
-inline_get_emission_heights (SV *hmm_p) {
+inline_get_relative_entropy_all (SV *hmm_p) {
   int           status;
   int           i, j;
   float        *rel_ents  = NULL; //passed into hmmlogo_emissionHeightsDivRelent(), but not used
   float        **heights  = NULL;
+  float        **probs    = NULL;
   P7_HMM       *hmm       = c_obj(hmm_p, P7_HMM);
   ESL_ALPHABET *abc       = hmm->abc;
   P7_BG        *bg        = p7_bg_Create(abc);
@@ -66,27 +67,36 @@ inline_get_emission_heights (SV *hmm_p) {
 
   ESL_ALLOC(rel_ents, (hmm->M+1) * sizeof(float));
   ESL_ALLOC(heights,  (hmm->M+1) * sizeof(float*));
-  for (i = 1; i <= hmm->M; i++)
+  ESL_ALLOC(probs,    (hmm->M+1) * sizeof(float*));
+  for (i = 1; i <= hmm->M; i++) {
     ESL_ALLOC(heights[i], abc->K * sizeof(float));
+    ESL_ALLOC(probs[i],   abc->K * sizeof(float));
+  }
 
-  hmmlogo_emissionHeightsDivRelent(hmm, bg, rel_ents, heights);
+  hmmlogo_RelativeEntropy_all(hmm, bg, rel_ents, probs, heights);
 
   arr2d_sv = convert_c2d_to_perl2d(heights, 1, hmm->M, 0, abc->K -1);
 
   p7_bg_Destroy(bg);
   free(rel_ents);
-  for (i = 1; i <= hmm->M; i++)
+  for (i = 1; i <= hmm->M; i++) {
+    free(probs[i]);
     free(heights[i]);
+  }
   free(heights);
+  free(probs);
 
   return (arr2d_sv);
 
 ERROR:
   if (bg != NULL) p7_bg_Destroy(bg);
   if (rel_ents != NULL) free(rel_ents);
-  for (i = 1; i <= hmm->M; i++)
+  for (i = 1; i <= hmm->M; i++) {
     if (heights[i] != NULL) free(heights[i]);
+    if (probs[i] != NULL) free(probs[i]);
+  }
   if (heights != NULL)  free(heights);
+  if (probs != NULL)  free(probs);
 
   croak("error getting emission heights");
   return NULL;
@@ -95,11 +105,12 @@ ERROR:
 
 
 SV*
-inline_get_posscore_heights (SV *hmm_p) {
+inline_get_relative_entropy_above_bg (SV *hmm_p) {
   int           status;
   int           i, j;
   float        *rel_ents  = NULL; //passed into hmmlogo_emissionHeightsDivRelent(), but not used
   float        **heights  = NULL;
+  float        **probs    = NULL;
   P7_HMM       *hmm       = c_obj(hmm_p, P7_HMM);
   ESL_ALPHABET *abc       = hmm->abc;
   P7_BG        *bg        = p7_bg_Create(abc);
@@ -108,26 +119,35 @@ inline_get_posscore_heights (SV *hmm_p) {
 
   ESL_ALLOC(rel_ents, (hmm->M+1) * sizeof(float));
   ESL_ALLOC(heights,  (hmm->M+1) * sizeof(float*));
-  for (i = 1; i <= hmm->M; i++)
+  ESL_ALLOC(probs,    (hmm->M+1) * sizeof(float*));
+  for (i = 1; i <= hmm->M; i++) {
     ESL_ALLOC(heights[i], abc->K * sizeof(float));
+    ESL_ALLOC(probs[i], abc->K * sizeof(float));
+  }
 
-  hmmlogo_posScoreHeightsDivRelent(hmm, bg, rel_ents, heights);
+  hmmlogo_RelativeEntropy_above_bg(hmm, bg, rel_ents, probs, heights);
   arr2d_sv = convert_c2d_to_perl2d(heights, 1, hmm->M, 0, abc->K -1);
 
   p7_bg_Destroy(bg);
   free(rel_ents);
-  for (i = 1; i <= hmm->M; i++)
+  for (i = 1; i <= hmm->M; i++) {
     free(heights[i]);
+    free(probs[i]);
+  }
   free(heights);
+  free(probs);
 
   return (arr2d_sv);
 
 ERROR:
   if (bg != NULL) p7_bg_Destroy(bg);
   if (rel_ents != NULL) free(rel_ents);
-  for (i = 1; i <= hmm->M; i++)
+  for (i = 1; i <= hmm->M; i++) {
     if (heights[i] != NULL) free(heights[i]);
+    if (probs[i] != NULL) free(probs[i]);
+  }
   if (heights != NULL)  free(heights);
+  if (probs != NULL)  free(probs);
 
   croak("error getting pos_score heights");
   return NULL;

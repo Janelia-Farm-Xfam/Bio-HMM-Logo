@@ -9,11 +9,10 @@
  *    6. Additional string functions, esl_str*()
  *    7. File path/name manipulation, including tmpfiles.
  *    8. Typed comparison functions.
- *    9. Commonly used background composition (iid) frequencies.
- *   10. Unit tests.
- *   11. Test driver.
- *   12. Examples. 
- *   13. Copyright and license. 
+ *    9. Unit tests.
+ *   10. Test driver.
+ *   11. Examples. 
+ *   12. Copyright and license. 
  */
 #include "esl_config.h"
 
@@ -31,6 +30,10 @@
 #ifdef _POSIX_VERSION
 #include <sys/stat.h>
 #include <sys/types.h>
+#endif
+
+#ifdef HAVE_MPI
+#include <mpi.h>		/* MPI_Abort() may be used in esl_fatal() or other program killers */
 #endif
 
 #include "easel.h"
@@ -53,8 +56,9 @@ static esl_exception_handler_f esl_exception_handler = NULL;
  *            a non-fatal exception handler.
  *            
  *            Easel programs normally call one of the exception-handling
- *            wrappers <ESL_EXCEPTION()> or <ESL_XEXCEPTION()>, rather
- *            than calling  <esl_exception> directly.
+ *            wrappers <ESL_EXCEPTION()> or <ESL_XEXCEPTION()>, which
+ *            handle the overhead of passing in <use_errno>, <sourcefile>,
+ *            and <sourceline>. <esl_exception> is rarely called directly.
  *            
  *            If no custom exception handler has been registered, the
  *            default behavior is to print a brief message to <stderr>
@@ -65,6 +69,10 @@ static esl_exception_handler_f esl_exception_handler = NULL;
  *            
  *            Fatal exception (source file foo.c, line 42):
  *            Something wicked this way came.
+ *
+ *            Additionally, in an MPI parallel program, the default fatal 
+ *            handler aborts all processes (with <MPI_Abort()>), not just
+ *            the one that called <esl_exception()>. 
  *            
  * Args:      errcode     - Easel error code, such as eslEINVAL. See easel.h.
  *            use_errno   - if TRUE, also use perror() to report POSIX errno message.
@@ -82,6 +90,9 @@ void
 esl_exception(int errcode, int use_errno, char *sourcefile, int sourceline, char *format, ...)
 {
   va_list argp;
+#ifdef HAVE_MPI
+  int     mpiflag;
+#endif
 
   if (esl_exception_handler != NULL) 
     {
@@ -99,6 +110,10 @@ esl_exception(int errcode, int use_errno, char *sourcefile, int sourceline, char
       fprintf(stderr, "\n");
       if (use_errno && errno) perror("system error");
       fflush(stderr);
+#ifdef HAVE_MPI
+      MPI_Initialized(&mpiflag);                 /* we're assuming we can do this, even in a corrupted, dying process...? */
+      if (mpiflag) MPI_Abort(MPI_COMM_WORLD, 1);
+#endif
       abort();
     }
 }
@@ -212,6 +227,10 @@ esl_nonfatal_handler(int errcode, int use_errno, char *sourcefile, int sourcelin
  *            AND the error is guaranteed to be a coding error. For an example,
  *            see <esl_opt_IsOn()>, which triggers a violation if the code
  *            checks for an option that isn't in the code.
+ *            
+ *            In an MPI-parallel program, the entire job is
+ *            terminated; all processes are aborted (<MPI_Abort()>,
+ *            not just the one that called <esl_fatal()>.
  * 
  * Args:      format  - <sprintf()> formatted exception message, followed
  *                      by any additional necessary arguments for that 
@@ -225,12 +244,20 @@ void
 esl_fatal(const char *format, ...)
 {
   va_list argp;
+#ifdef HAVE_MPI
+  int mpiflag;
+#endif
 
   va_start(argp, format);
   vfprintf(stderr, format, argp);
   va_end(argp);
   fprintf(stderr, "\n");
   fflush(stderr);
+
+#ifdef HAVE_MPI
+  MPI_Initialized(&mpiflag);
+  if (mpiflag) MPI_Abort(MPI_COMM_WORLD, 1);
+#endif
   exit(1);
 }
 /*---------------- end, error handling conventions --------------*/
@@ -1129,91 +1156,63 @@ esl_str_IsBlank(char *s)
 }
 
 /* Function:  esl_str_IsInteger()
- * Synopsis:  Return TRUE if <s> is an integer; else FALSE.
+ * Synopsis:  Return TRUE if <s> represents an integer; else FALSE.
  *
  * Purpose:   Given a NUL-terminated string <s>, return TRUE
- *            if the complete string is convertible to an integer 
- *            by the rules of <atoi()>.
+ *            if the complete string is convertible to a base-10 integer 
+ *            by the rules of <strtol()> or <atoi()>. 
  *            
- *            Leading whitespace is skipped. A leading sign character
- *            + or - is allowed. A prefix of 0x or 0X indicates
- *            a hexadecimal number follows; a prefix of 0 indicates
- *            that an octal number follows.
+ *            Leading and trailing whitespace is allowed, but otherwise
+ *            the entire string <s> must be convertable. (Unlike <strtol()>
+ *            itself, which will convert a prefix. ' 99 foo' converts
+ *            to 99, but <esl_str_IsInteger()> will return FALSE.
  *            
  *            If <s> is <NULL>, FALSE is returned.
  */
 int
 esl_str_IsInteger(char *s)
 {
-  int hex = FALSE;
+  char *endp;
+  long  val;
 
-  if (s == NULL) return FALSE;
-  while (isspace((int) (*s))) s++;      /* skip whitespace */
-  if (*s == '-' || *s == '+') s++;      /* skip leading sign */
-				        /* skip leading conversion signals */
-  if ((strncmp(s, "0x", 2) == 0 && (int) strlen(s) > 2) ||
-      (strncmp(s, "0X", 2) == 0 && (int) strlen(s) > 2))
-    {
-      s += 2;
-      hex = 1;
-    }
-  else if (*s == '0' && (int) strlen(s) > 1)
-    s++;
-				/* examine remainder for garbage chars */
-  if (!hex)  while (*s != '\0') { if (!isdigit ((int) (*s))) return FALSE; s++; }
-  else       while (*s != '\0') { if (!isxdigit((int) (*s))) return FALSE; s++; }
+  if (s == NULL) return FALSE;	        /* it's NULL */
+  val = strtol(s, &endp, 10);
+  if (endp == s) return FALSE;          /* strtol() can't convert it */
+  for (s = endp; *s != '\0'; s++)
+    if (! isspace(*s)) return FALSE;    /* it has trailing nonconverted nonwhitespace */
   return TRUE;
 }
 
 /* Function:  esl_str_IsReal()
- * Synopsis:  Return TRUE if <s> is a real number; else FALSE.
+ * Synopsis:  Return TRUE if string <s> represents a real number; else FALSE.
  *
  * Purpose:   Given a NUL-terminated string <s>, return <TRUE>
- *            if the string is convertible to a floating-point
- *            real number by the rules of <atof()>. 
+ *            if the string is completely convertible to a floating-point
+ *            real number by the rules of <strtod()> and <atof()>. 
+ *            (Which allow for exponential forms, hexadecimal forms,
+ *            and case-insensitive INF, INFINITY, NAN, all w/ optional
+ *            leading +/- sign.)
+ * 
+ *            No trailing garbage is allowed, unlike <strtod()>. The
+ *            entire string must be convertible, allowing leading and
+ *            trailing whitespace is allowed. '99.0 foo' converts
+ *            to 99.0 with <strtod()> but is <FALSE> for 
+ *            <esl_str_IsReal()>. '  99.0  ' is <TRUE>.
  *            
- *            Leading space is skipped. A leading sign of either
- *            + or - is allowed. Scientific notation is expressed
- *            with either e or E, as in 1.0e12 or 2.1E42.
+ *            If <s> is <NULL>, return <FALSE>.
  */
 int
 esl_str_IsReal(char *s)
 {
-  int gotdecimal = 0;
-  int gotexp     = 0;
-  int gotreal    = 0;
+  char   *endp;
+  double  val;
 
-  if (s == NULL) return FALSE;
-
-  while (isspace((int) (*s))) s++; /* skip leading whitespace */
-  if (*s == '-' || *s == '+') s++; /* skip leading sign */
-
-  /* Examine remainder for garbage. Allowed one '.' and
-   * one 'e' or 'E'; if both '.' and e/E occur, '.'
-   * must be first.
-   */
-  while (*s != '\0')
-    {
-      if (isdigit((int) (*s))) 	gotreal++;
-      else if (*s == '.')
-	{
-	  if (gotdecimal) return FALSE; /* can't have two */
-	  if (gotexp)     return FALSE; /* e/E preceded . */
-	  else gotdecimal++;
-	}
-      else if (*s == 'e' || *s == 'E')
-	{
-	  if (gotexp) return FALSE;	/* can't have two */
-	  else gotexp++;
-	}
-      else if (isspace((int) (*s)))
-	break;
-      s++;
-    }
-
-  while (isspace((int) (*s))) s++;         /* skip trailing whitespace */
-  if (*s == '\0' && gotreal) return TRUE;
-  else return FALSE;
+  if (! s) return FALSE;		      /* <s> is NULL */
+  val = strtod(s, &endp);
+  if (val == 0.0f && endp == s) return FALSE; /* strtod() can't convert it */
+  for (s = endp; *s != '\0'; s++)
+    if (! isspace(*s)) return FALSE;          /* it has trailing nonconverted nonwhitespace */
+  return TRUE;
 }
 
 
@@ -1846,7 +1845,7 @@ esl_FCompare(float a, float b, float tol)
  *            approximate equality, by absolute difference.  Return
  *            <eslOK> if equal, <eslFAIL> if not.
  *            
- *            Equality is defined as <fabs(a-b) \leq tol> for finite
+ *            Equality is defined as <fabs(a-b) $\leq$ tol> for finite
  *            <a,b>; or <inf=inf>, <NaN=NaN> when either value is not
  *            finite.
  *            
@@ -1912,161 +1911,46 @@ esl_CCompare(char *s1, char *s2)
 
 
 
-/*****************************************************************
- * 9. Commonly used background composition (iid) frequencies. 
- *****************************************************************/
-
-/* Function:  esl_composition_BL62()
- *
- * Purpose:   Sets <f> to the background frequencies used in
- *            \citep{Henikoff92} to calculate the BLOSUM62
- *            substitution matrix. Caller provides space in <f>
- *            allocated for at least 20 doubles.  The entries are in
- *            alphabetic order A..Y, same as the standard Easel amino
- *            acid alphabet order.
- *
- * Returns:   <eslOK> on success.
- */
-int
-esl_composition_BL62(double *f)
-{
-  f[0]  = 0.074;
-  f[1]  = 0.025;
-  f[2]  = 0.054;
-  f[3]  = 0.054;
-  f[4]  = 0.047;
-  f[5]  = 0.074;
-  f[6]  = 0.026;
-  f[7]  = 0.068;
-  f[8]  = 0.058;
-  f[9]  = 0.099;
-  f[10] = 0.025;
-  f[11] = 0.045;
-  f[12] = 0.039;
-  f[13] = 0.034;
-  f[14] = 0.052;
-  f[15] = 0.057;
-  f[16] = 0.051;
-  f[17] = 0.073;
-  f[18] = 0.013;
-  f[19] = 0.032;
-  return eslOK;
-}
-
-/* Function:  esl_composition_WAG()
- *
- * Purpose:   Sets <f> to the background frequencies used in
- *            \citep{WhelanGoldman01} to calculate the WAG rate
- *            matrix. Caller provides space in <f> allocated for at
- *            least 20 doubles.  The entries are in alphabetic order
- *            A..Y, same as the standard Easel amino acid alphabet
- *            order.
- *
- * Returns:   <eslOK> on success.
- */
-int
-esl_composition_WAG(double *f)
-{
-  f[0]  = 0.086628;                     /* A */
-  f[1]  = 0.019308;	                /* C */
-  f[2]  = 0.057045;	                /* D */
-  f[3]  = 0.058059;	                /* E */
-  f[4]  = 0.038432;	                /* F */
-  f[5]  = 0.083252;	                /* G */
-  f[6]  = 0.024431;	                /* H */
-  f[7]  = 0.048466;	                /* I */
-  f[8]  = 0.062029;	                /* K */
-  f[9]  = 0.086209;	                /* L */
-  f[10] = 0.019503;	                /* M */
-  f[11] = 0.039089;	                /* N */
-  f[12] = 0.045763;	                /* P */
-  f[13] = 0.036728;	                /* Q */
-  f[14] = 0.043972;	                /* R */
-  f[15] = 0.069518;	                /* S */
-  f[16] = 0.061013;	                /* T */
-  f[17] = 0.070896;	                /* V */
-  f[18] = 0.014386;	                /* W */
-  f[19] = 0.035274;	                /* Y */
-  return eslOK;
-}
-
-/* Function:  esl_composition_SW34()
- *
- * Purpose:   Sets <f> to the background frequencies observed in
- *            Swiss-Prot release 34 (21.2M residues).  Caller provides
- *            space in <f> allocated for at least 20 doubles.  The
- *            entries are in alphabetic order A..Y, same as the
- *            standard Easel amino acid alphabet order.
- *
- * Returns:   <eslOK> on success.
- */
-int
-esl_composition_SW34(double *f)
-{
-  f[0]  = 0.075520;                     /* A */
-  f[1]  = 0.016973;                     /* C */
-  f[2]  = 0.053029;                     /* D */
-  f[3]  = 0.063204;                     /* E */
-  f[4]  = 0.040762;                     /* F */
-  f[5]  = 0.068448;                     /* G */
-  f[6]  = 0.022406;                     /* H */
-  f[7]  = 0.057284;                     /* I */
-  f[8]  = 0.059398;                     /* K */
-  f[9]  = 0.093399;                     /* L */
-  f[10] = 0.023569;                     /* M */
-  f[11] = 0.045293;                     /* N */
-  f[12] = 0.049262;                     /* P */
-  f[13] = 0.040231;                     /* Q */
-  f[14] = 0.051573;                     /* R */
-  f[15] = 0.072214;                     /* S */
-  f[16] = 0.057454;                     /* T */
-  f[17] = 0.065252;                     /* V */
-  f[18] = 0.012513;                     /* W */
-  f[19] = 0.031985;                     /* Y */
-  return eslOK;
-}
-
-
-/* Function:  esl_composition_SW50()
- *
- * Purpose:   Sets <f> to the background frequencies observed in
- *            Swiss-Prot release 50.8 (86.0M residues; Oct 2006).
- *
- * Returns:   <eslOK> on success.
- */
-int
-esl_composition_SW50(double *f)
-{
-  f[0] = 0.0787945;		/* A */
-  f[1] = 0.0151600;		/* C */
-  f[2] = 0.0535222;		/* D */
-  f[3] = 0.0668298;		/* E */
-  f[4] = 0.0397062;		/* F */
-  f[5] = 0.0695071;		/* G */
-  f[6] = 0.0229198;		/* H */
-  f[7] = 0.0590092;		/* I */
-  f[8] = 0.0594422;		/* K */
-  f[9] = 0.0963728;		/* L */
-  f[10]= 0.0237718;		/* M */
-  f[11]= 0.0414386;		/* N */
-  f[12]= 0.0482904;		/* P */
-  f[13]= 0.0395639;		/* Q */
-  f[14]= 0.0540978;		/* R */
-  f[15]= 0.0683364;		/* S */
-  f[16]= 0.0540687;		/* T */
-  f[17]= 0.0673417;		/* V */
-  f[18]= 0.0114135;		/* W */
-  f[19]= 0.0304133;		/* Y */
-  return eslOK;
-}
-/*-------------- end, background compositions -------------------*/
 
 
 
 /*****************************************************************
- * 10. Unit tests.
+ * 9. Unit tests.
  *****************************************************************/
 #ifdef eslEASEL_TESTDRIVE
+
+static void
+utest_IsInteger(void)
+{
+  char *goodones[] = { " 99 " };
+  char *badones[]  = {  "",  " 99 foo " };
+  int ngood = sizeof(goodones) / sizeof(char *);
+  int nbad  = sizeof(badones)  / sizeof(char *);
+  int i;
+
+  for (i = 0; i < ngood; i++)
+    if (! esl_str_IsInteger(goodones[i])) esl_fatal("esl_str_IsInteger() should have recognized %s", goodones[i]);
+  for (i = 0; i < nbad;  i++)
+    if (  esl_str_IsInteger(badones[i]))  esl_fatal("esl_str_IsInteger() should not have recognized %s", badones[i]);
+}
+
+static void
+utest_IsReal(void)
+{
+  char *goodones[] = { "99", " \t 99", "-99.00", "+99.00e-12", "+0xabc.defp-12",  "  +INFINITY", "-nan" };
+  char *badones[] = {  "", 
+		       "FIBB_BOVIN/67-212",	/* testing for a fixed bug, 17 Dec 2012, reported by ER */
+  };
+  int ngood = sizeof(goodones) / sizeof(char *);
+  int nbad  = sizeof(badones)  / sizeof(char *);
+  int i;
+
+  for (i = 0; i < ngood; i++)
+    if (! esl_str_IsReal(goodones[i])) esl_fatal("esl_str_IsReal() should have recognized %s", goodones[i]);
+  for (i = 0; i < nbad;  i++)
+    if (  esl_str_IsReal(badones[i]))  esl_fatal("esl_str_IsReal() should not have recognized %s", badones[i]);
+}
+
 
 static void
 utest_strmapcat(void)
@@ -2221,7 +2105,7 @@ utest_tmpfile_named(void)
 
 
 /*****************************************************************
- * 11. Test driver.
+ * 10. Test driver.
  *****************************************************************/
 
 #ifdef eslEASEL_TESTDRIVE
@@ -2236,6 +2120,8 @@ int main(void)
   esl_exception_SetHandler(&esl_nonfatal_handler);
 #endif
 
+  utest_IsInteger();
+  utest_IsReal();
   utest_strmapcat();
   utest_strtok();
   utest_sprintf();
@@ -2246,7 +2132,7 @@ int main(void)
 #endif /*eslEASEL_TESTDRIVE*/
 
 /*****************************************************************
- * 12. Examples.
+ * 11. Examples.
  *****************************************************************/
 
 #ifdef eslEASEL_EXAMPLE

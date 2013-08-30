@@ -40,6 +40,14 @@
  *    If you do not want invalid input regex syntax to halt your application,
  *    you can install a custom error handler that can handle
  *    the eslESYNTAX errors as you wish.
+ *****************************************************************
+ * TODO:
+ *  - would be great to have an esl_regexp_Sample(), which sampled
+ *    strings from a regexp. We could use this in unit tests that 
+ *    need to stress edge cases (generating strings with unusual
+ *    but legal characters, for example). We would probably want
+ *    to implement some artificial limits on repeat operators,
+ *    to keep length of sampled seq reasonable.
  */
 #include "esl_config.h"
 
@@ -337,6 +345,44 @@ esl_regexp_SubmatchCoords(ESL_REGEXP *machine, char *origin, int elem,
   *ret_end   = 0;
   return status;
 }
+
+
+
+/* Function:  esl_regexp_ParseCoordString()
+ *
+ * Purpose:   Given a string <cstring> of the format required for a
+ *            range (<from>..<to>, e.g. 10..23  or 39-91) parse out
+ *            the start and end, and return them within the variables
+ *            <ret_start> and <ret_end>.
+ *
+ * Returns:   <eslOK> on success, and <ret_start> and <ret_end>
+ *            are set to the start/end coordinates of the parse.
+ *
+ * Throws:    <eslESYNTAX> if a regexp match is not made, and
+ *            <eslFAIL> if the start or end values are not parsed.
+ */
+int
+esl_regexp_ParseCoordString(const char *cstring, uint32_t *ret_start, uint32_t *ret_end)
+{
+  ESL_REGEXP *re = esl_regexp_Create();
+  char        tok1[32];
+  char        tok2[32];
+
+  if (esl_regexp_Match(re, "^(\\d+)\\D+(\\d*)$", cstring) != eslOK) return eslESYNTAX;
+  if (esl_regexp_SubmatchCopy(re, 1, tok1, 32)            != eslOK) return eslFAIL;
+  if (esl_regexp_SubmatchCopy(re, 2, tok2, 32)            != eslOK) return eslFAIL;
+
+  *ret_start = atol(tok1);
+  *ret_end   = (tok2[0] == '\0') ? 0 : atol(tok2);
+
+  /* '0' is invalid start, check for that */
+  if(*ret_start == 0)                  esl_fatal("-c takes arg of positive integer subseq coords <from>..<to>, read 0 as <from>");
+
+  esl_regexp_Destroy(re);
+  return eslOK;
+}
+
+
 /*=================== end of the exposed API ==========================================*/
 
 

@@ -20,8 +20,19 @@
 #include "esl_gumbel.h"
 #include "esl_vectorops.h"
 
-
 #include "hmmer.h"
+
+/* Struct used to pass a collection of useful temporary objects around
+ * within the LongTarget functions
+ *  */
+typedef struct {
+  ESL_SQ           *tmpseq; // - a new or reused digital sequence object used for p7_alidisplay_Create() call
+  P7_BG            *bg;
+  P7_OPROFILE      *om;
+  float            *scores;
+  float            *fwd_emissions_arr;
+} P7_PIPELINE_LONGTARGET_OBJS;
+
 
 /*****************************************************************
  * 1. The P7_PIPELINE object: allocation, initialization, destruction.
@@ -308,13 +319,14 @@ p7_pipeline_Destroy(P7_PIPELINE *pli)
  * Returns:   <eslOK>
  */
 int
-p7_pli_ExtendAndMergeWindows (P7_OPROFILE *om, const P7_SCOREDATA *data, P7_HMM_WINDOWLIST *windowlist, int L, float pct_overlap) {
+p7_pli_ExtendAndMergeWindows (P7_OPROFILE *om, const P7_SCOREDATA *data, P7_HMM_WINDOWLIST *windowlist, float pct_overlap) {
 
   int i;
   P7_HMM_WINDOW        *prev_window = NULL;
   P7_HMM_WINDOW        *curr_window = NULL;
   int              window_start;
   int              window_end;
+  int              window_len;
   int new_hit_cnt = 0;
 
   if (windowlist->count == 0)
@@ -325,11 +337,11 @@ p7_pli_ExtendAndMergeWindows (P7_OPROFILE *om, const P7_SCOREDATA *data, P7_HMM_
     curr_window = windowlist->windows+i;
 
     // the 0.1 multiplier provides for a small buffer in excess of the predefined prefix/suffix lengths - one proportional to max_length
-    window_start = ESL_MAX( 1,   curr_window->n - ( om->max_length * (0.1 + data->prefix_lengths[curr_window->k - curr_window->length + 1]  )) ) ;
-    window_end   = ESL_MIN( L ,  curr_window->n + curr_window->length + (om->max_length * (0.1 + data->suffix_lengths[curr_window->k] ) ) )   ;
-
-    curr_window->n = window_start;
+    window_start = ESL_MAX( 1                      ,  curr_window->n -                       (om->max_length * (0.1 + data->prefix_lengths[curr_window->k - curr_window->length + 1]  )) ) ;
+    window_end   = ESL_MIN( curr_window->target_len,  curr_window->n + curr_window->length + (om->max_length * (0.1 + data->suffix_lengths[curr_window->k] ) ) )   ;
     curr_window->length = window_end - window_start + 1;
+    curr_window->fm_n -= (curr_window->n - window_start);
+    curr_window->n = window_start;
   }
 
 
@@ -340,27 +352,21 @@ p7_pli_ExtendAndMergeWindows (P7_OPROFILE *om, const P7_SCOREDATA *data, P7_HMM_
 
     window_start = ESL_MAX(prev_window->n, curr_window->n);
     window_end   = ESL_MIN(prev_window->n+prev_window->length-1, curr_window->n+curr_window->length-1);
+    window_len   = window_end - window_start + 1;
 
-    if (  (float)(window_end-window_start+1)/ESL_MIN(prev_window->length, curr_window->length) > pct_overlap ) {
-//    if (curr_window->n <= prev_window->n + prev_window->length ) {
+    if (  prev_window->complementarity == curr_window->complementarity &&
+          prev_window->id == curr_window->id &&
+          (float)(window_len)/ESL_MIN(prev_window->length, curr_window->length) > pct_overlap  &&
+          curr_window->n + curr_window->length >  prev_window->n + prev_window->length  )
+    {
       //merge windows
-      if (  curr_window->n + curr_window->length >  prev_window->n + prev_window->length )
-        prev_window->length = curr_window->n + curr_window->length - prev_window->n;  //+1, -1 factored out
-
+      prev_window->length = curr_window->n + curr_window->length - prev_window->n;  //+1, -1 factored out
     } else {
       new_hit_cnt++;
       windowlist->windows[new_hit_cnt] = windowlist->windows[i];
     }
   }
   windowlist->count = new_hit_cnt+1;
-
-  /* ensure that window start and end are within target sequence bounds */
-  if ( windowlist->windows[0].n  <  1)
-    windowlist->windows[0].n =  1;
-
-  if ( windowlist->windows[windowlist->count-1].n + windowlist->windows[windowlist->count-1].length - 1  >  L)
-    windowlist->windows[windowlist->count-1].length =  L - windowlist->windows[windowlist->count-1].n + 1;
-
 
   return eslOK;
 }
@@ -874,18 +880,19 @@ p7_Pipeline(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, const ESL_SQ *sq, P7_T
 /* Function:  p7_pli_computeAliScores()
  * Synopsis:  Compute per-position scores for the alignment for a domain
  *
- * Purpose:   Compute per-position scores for the alignment for a domain
+ * Purpose:   Compute per-position (Viterbi) scores for the alignment for a domain,
+ *            for the purpose of optionally printing these scores out in association
+ *            with each alignment. Such scores can, for example, be used to detangle
+ *            overlapping alignments (from different models)
  *
  * Args:      dom             - domain with the alignment for which we wish to compute scores
  *            seq             - sequence in which domain resides
- *            data         - contains model's emission and transition values in unstriped form
+ *            data            - contains model's emission and transition values in unstriped form
  *            K               - alphabet size
  *
  * Returns:   <eslOK> on success.
  *
  * Throws:    <eslEMEM> on allocation failure.
- *
- * Xref:      J4/25.
  */
 static int
 p7_pli_computeAliScores(P7_DOMAIN *dom, ESL_DSQ *seq, const P7_SCOREDATA *data, int K)
@@ -947,204 +954,12 @@ ERROR:
 }
 
 
-/* Function:  p7_pli_modifyAliBoundaries()
- * Synopsis:  Compute per-position scores for the alignment for a domain
- *
- * Purpose:   Compute per-position scores for the alignment for a domain
- *
- * Args:      dom             - domain with the alignment for which we wish to compute scores
- *            seq             - sequence in which domain resides
- *            data         - contains model's emission and transition values in unstriped form
- *            thresh          - the threshold at which any lower-scoring end will be trimmed
- *            K               - alphabet size
- *
- * Returns:   <eslOK> on success.
- *
- * Throws:    <eslEMEM> on allocation failure.
- *
- *   ( deprecated and unused, to be removed soon )
- */
-static int
-p7_pli_modifyAliBoundaries(P7_DOMAIN *dom, ESL_DSQ *seq, const P7_SCOREDATA *data, float thresh, int K)
-{
-    //update alignment: trim  terminal sections with (a) all Ns or (b) negative score
-    int left_neg = -1;
-    float left_min = thresh;
-    float left_sum = 0.0;
-
-    int right_neg = dom->ad->N;
-    float right_min = thresh;
-    float right_sum = 0.0;
-
-    int ali_len;
-    int i = 0;
-
-
-    /*
-    //check if alignments can be trivially extended by adding a
-    //maximal extension of positive-scoring bases
-
-    //look left
-    int left_change=0;
-    while ( data->fwd_scores[K * (dom->ad->hmmfrom-left_change-1) + seq[(dom->iali-left_change-1)]] > 0 ) {
-      //dom->ad->hmmfrom--;
-      //dom->iali--;
-      left_change++;
-    }
-    //look right
-    int right_change=0;
-    while ( data->fwd_scores[K * (dom->ad->hmmto+right_change+1) + seq[(dom->jali+right_change+1)]] > 0 ) {
-      //dom->ad->hmmto++;
-      //dom->jali++;
-      right_change++;
-    }
-    printf ("push out: %d\n", left_change+right_change);
-    */
-
-    ali_len = dom->jali - dom->iali + 1;
-
-
-    //walk in on both ends of the alignment
-    while (i < ali_len) {
-      if (dom->scores_per_pos[i] != -eslINFINITY) {
-        left_sum += dom->scores_per_pos[i];
-        if (left_sum < left_min) {
-          left_min = left_sum;
-          left_neg = i;
-        }
-      }
-      i++;
-    }
-
-    i = dom->ad->N-1;
-    while (i >= 0) {
-      if (dom->scores_per_pos[i] != -eslINFINITY) {
-        right_sum += dom->scores_per_pos[i];
-        if (right_sum < right_min) {
-          right_min = right_sum;
-          right_neg = i;
-        }
-      }
-      i--;
-    }
-    // because gaps scores are stored in the right-most entry for the gap,
-    // this may leave us with a trailing gap.  Clean that up
-    if (dom->ad->model[right_neg] == '.' ||  dom->ad->aseq[right_neg] == '-') {
-      while (dom->ad->model[right_neg] == '.' ||  dom->ad->aseq[right_neg] == '-')
-        right_neg--;
-      right_neg++;
-    }
-
-
-    //if the negatives have overlapped, pin whichever is responsible for the lowest
-    // score, and recompute the other side.
-    if (left_neg > right_neg) {
-
-      if (right_min < left_min) {
-        //recompute left_min
-        left_neg = -1;
-        left_min = 0.0;
-        left_sum = 0.0;
-        i = 0;
-        while (i < right_neg - 1) {
-          if (dom->scores_per_pos[i] != -eslINFINITY) {
-            left_sum += dom->scores_per_pos[i];
-            if (left_sum < left_min) {
-              left_min = left_sum;
-              left_neg = i;
-            }
-          }
-          i++;
-        }
-      } else {
-        //recompute right min
-        right_neg = dom->ad->N;
-        right_min = 0.0;
-        right_sum = 0.0;
-        i = dom->ad->N-1;
-        while (i >= left_neg+1) {
-          if (dom->scores_per_pos[i] != -eslINFINITY) {
-            right_sum += dom->scores_per_pos[i];
-            if (right_sum < right_min) {
-              right_min = right_sum;
-              right_neg = i;
-            }
-          }
-          i--;
-        }
-        // because gaps scores are stored in the right-most entry for the gap,
-        // this may leave us with a trailing gap.  Clean that up
-        if (dom->ad->model[right_neg] == '.' ||  dom->ad->aseq[right_neg] == '-') {
-          while (dom->ad->model[right_neg] == '.' ||  dom->ad->aseq[right_neg] == '-')
-            right_neg--;
-          right_neg++;
-        }
-
-      }
-    }
-
-
-    //modify positions
-    for (i=0; i<=left_neg; i++) {
-      if (dom->ad->aseq[i] != '-')  dom->iali++;
-      if (dom->ad->model[i] != '.') dom->ad->hmmfrom++;
-    }
-    for (i=dom->ad->N - 1; i>=right_neg; i--)  {
-      if (dom->ad->aseq[i] != '-')  dom->jali--;
-      if (dom->ad->model[i] != '.') dom->ad->hmmto--;
-    }
-    dom->ad->N = right_neg - left_neg - 1;
-
-
-    //overriding hqfrom and hqto, as I expect those to be removed in the next release
-    dom->ad->sqfrom = dom->iali;
-    dom->ad->sqto   = dom->jali;
-
-    for (i=0; i<dom->ad->N; i++)
-      dom->scores_per_pos[i] = dom->scores_per_pos[i+left_neg+1];
-
-
-    //modify strings
-    if (dom->ad->model) {
-      dom->ad->model[right_neg] = '\0';
-      dom->ad->model = dom->ad->model + left_neg + 1;
-    }
-    if (dom->ad->mline) {
-      dom->ad->mline[right_neg] = '\0';
-      dom->ad->mline = dom->ad->mline + left_neg + 1;
-    }
-    if (dom->ad->aseq) {
-      dom->ad->aseq[right_neg] = '\0';
-      dom->ad->aseq = dom->ad->aseq + left_neg + 1;
-    }
-    if (dom->ad->rfline) {
-      dom->ad->rfline[right_neg] = '\0';
-      dom->ad->rfline = dom->ad->rfline + left_neg + 1;
-    }
-    if (dom->ad->mmline) {
-      dom->ad->mmline[right_neg] = '\0';
-      dom->ad->mmline = dom->ad->mmline + left_neg + 1;
-    }
-    if (dom->ad->csline) {
-      dom->ad->csline[right_neg] = '\0';
-      dom->ad->csline = dom->ad->csline + left_neg + 1;
-    }
-    if (dom->ad->ppline) {
-      dom->ad->ppline[right_neg] = '\0';
-      dom->ad->ppline = dom->ad->ppline + left_neg + 1;
-    }
-
-  return eslOK;
-
-}
-
-
 /* Function:  p7_pli_postViterbi_LongTarget()
  * Synopsis:  the part of the LongTarget P7 search Pipeline downstream
  *            of the Viterbi filter
  *
  * Purpose:   This is called by postMSV_LongTarget(), and runs the
- *            post-Viterbi part of H3's accelerated pipeline to
+ *            post-Viterbi part of HMMER's accelerated pipeline to
  *            compare profile <om> against sequence <sq>. If a
  *            significant hit is found, information about it is
  *            added to the <hitlist>.
@@ -1156,22 +971,23 @@ p7_pli_modifyAliBoundaries(P7_DOMAIN *dom, ESL_DSQ *seq, const P7_SCOREDATA *dat
  *            om              - optimized profile (query)
  *            bg              - background model
  *            hitlist         - pointer to hit storage bin
- *            data         - for computing windows based on maximum prefix/suffix extensions
+ *            data            - for computing windows based on maximum prefix/suffix extensions
  *            seqidx          - the id # of the sequence from which the current window was extracted
  *            window_start    - the starting position of the extracted window (offset from the first
  *                              position of the block of a possibly longer sequence)
  *            window_len      - the length of the extracted window
- *            tmpseq          - a new or reused digital sequence object used for "domain" definition
  *            subseq          - digital sequence of the extracted window
  *            seq_start       - first position of the sequence block passed in to the calling pipeline function
  *            seq_name        - name of the sequence the window comes from
  *            seq_source      - source of the sequence the window comes from
  *            seq_acc         - acc of the sequence the window comes from
  *            seq_desc        - desc of the sequence the window comes from
- *            nullsc          - score of the passed window vs the bg model
- *            usc             - msv score of the passed window
+ *            seq_len         - length of the sequence the window comes from (Available from FM; otherwise 0 and to be ignored)
  *            complementarity - boolean; is the passed window sourced from a complementary sequence block
- *
+ *            overlap         - number of residues in this sequence window that overlap a preceding window.
+ *            pli_tmp         - a collection of objects used in the long target pipeline that should be
+ *                              (and are) only allocated once per pipeline to minimize alloc overhead.
+
  * Returns:   <eslOK> on success. If a significant hit is obtained,
  *            its information is added to the growing <hitlist>.
  *
@@ -1187,9 +1003,9 @@ p7_pli_modifyAliBoundaries(P7_DOMAIN *dom, ESL_DSQ *seq, const P7_SCOREDATA *dat
  */
 static int
 p7_pli_postViterbi_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHITS *hitlist, const P7_SCOREDATA *data,
-    int64_t seqidx, int window_start, int window_len, ESL_SQ *tmpseq,
-    ESL_DSQ *subseq, int seq_start, char *seq_name, char *seq_source, char* seq_acc, char* seq_desc,
-    int complementarity, int *overlap, float *bgf_arr, float *scores_arr, float *fwd_emissions_arr
+    int64_t seqidx, int window_start, int window_len, ESL_DSQ *subseq,
+    int seq_start, char *seq_name, char *seq_source, char* seq_acc, char* seq_desc, int seq_len,
+    int complementarity, int *overlap, P7_PIPELINE_LONGTARGET_OBJS *pli_tmp
 )
 {
   P7_DOMAIN        *dom     = NULL;     /* conveience variable, ptr to current domain */
@@ -1215,11 +1031,15 @@ p7_pli_postViterbi_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_T
 
   p7_bg_SetLength(bg, window_len);
   p7_bg_NullOne  (bg, subseq, window_len, &nullsc);
-  p7_bg_FilterScore(bg, subseq, window_len, &bias_filtersc);
-  bias_filtersc -= nullsc;  //remove nullsc, so bias scaling can be done, then add it back on later
+  if (pli->do_biasfilter)
+  {
+    p7_bg_FilterScore(bg, subseq, window_len, &bias_filtersc);
+    bias_filtersc -= nullsc;  //remove nullsc, so bias scaling can be done, then add it back on later
+  } else {
+    bias_filtersc = 0;
+  }
 
   p7_oprofile_ReconfigRestLength(om, window_len);
-
 
   /* Parse with Forward and obtain its real Forward score. */
   p7_ForwardParser(subseq, window_len, om, pli->oxf, &fwdsc);
@@ -1233,23 +1053,23 @@ p7_pli_postViterbi_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_T
   *overlap = -1; // overload variable to tell calling function that this window passed fwd
 
   /*now that almost everything has been filtered away, set up seq object for domaindef function*/
-  if ((status = esl_sq_SetName     (tmpseq, seq_name))   != eslOK) goto ERROR;
-  if ((status = esl_sq_SetSource   (tmpseq, seq_source)) != eslOK) goto ERROR;
-  if ((status = esl_sq_SetAccession(tmpseq, seq_acc))    != eslOK) goto ERROR;
-  if ((status = esl_sq_SetDesc     (tmpseq, seq_desc))   != eslOK) goto ERROR;
-  if ((status = esl_sq_GrowTo      (tmpseq, window_len)) != eslOK) goto ERROR;
-  tmpseq->n = window_len;
-
-  if ((status = esl_abc_dsqcpy(subseq, window_len, tmpseq->dsq)) != eslOK) goto ERROR;
-  tmpseq->dsq[window_len+1]= eslDSQ_SENTINEL;
+  if ((status = esl_sq_SetName     (pli_tmp->tmpseq, seq_name))   != eslOK) goto ERROR;
+  if ((status = esl_sq_SetSource   (pli_tmp->tmpseq, seq_source)) != eslOK) goto ERROR;
+  if ((status = esl_sq_SetAccession(pli_tmp->tmpseq, seq_acc))    != eslOK) goto ERROR;
+  if ((status = esl_sq_SetDesc     (pli_tmp->tmpseq, seq_desc))   != eslOK) goto ERROR;
+  pli_tmp->tmpseq->L = seq_len;
+  pli_tmp->tmpseq->n = window_len;
+  pli_tmp->tmpseq->dsq = subseq;
 
   /* Now a Backwards parser pass, and hand it to domain definition workflow
    * In this case "domains" will end up being translated as independent "hits" */
   p7_omx_GrowTo(pli->oxb, om->M, 0, window_len);
-  p7_BackwardParser(tmpseq->dsq, window_len, om, pli->oxf, pli->oxb, NULL);
+  p7_BackwardParser(pli_tmp->tmpseq->dsq, window_len, om, pli->oxf, pli->oxb, NULL);
 
-  status = p7_domaindef_ByPosteriorHeuristics(tmpseq, om, pli->oxf, pli->oxb, pli->fwd, pli->bck, pli->ddef, bg, TRUE,
-                                                 bgf_arr, scores_arr, fwd_emissions_arr);
+  //if we're asked to not do null correction, pass a NULL instead of a temp scores variable - domaindef knows what to do
+  status = p7_domaindef_ByPosteriorHeuristics(pli_tmp->tmpseq, om, pli->oxf, pli->oxb, pli->fwd, pli->bck, pli->ddef, bg, TRUE,
+                                              pli_tmp->bg, (pli->do_null2?pli_tmp->scores:NULL), pli_tmp->fwd_emissions_arr);
+
 
   if (status != eslOK) ESL_FAIL(status, pli->errbuf, "domain definition workflow failure"); /* eslERANGE can happen */
   if (pli->ddef->nregions   == 0)  return eslOK; /* score passed threshold but there's no discrete domains here       */
@@ -1273,33 +1093,36 @@ p7_pli_postViterbi_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_T
   {
 
       dom = pli->ddef->dcl + d;
-      p7_pli_computeAliScores(dom, subseq, data, om->abc->Kp);
 
-
-     /* note: the initial bitscore of a hit depends on the window_len of the
-      * current window. Here, the score is modified (reduced) by treating
-      * all passing windows as though they came from windows of length
-      * om->max_length. For details, see
-      * ~wheelert/notebook/2012/0130_bits_v_evalues/00NOTES (Feb 1)
-      */
       //adjust the score of a hit to account for the full length model - the characters outside the envelope but in the window
       env_len = dom->jenv - dom->ienv + 1;
       ali_len = dom->jali - dom->iali + 1;
       bitscore = dom->envsc ;
-      //For these modifications, see notes, ~/notebook/2010/0716_hmmer_score_v_eval_bug/, end of Thu Jul 22 13:36:49 EDT 2010
-      bitscore -= 2 * log(2. / (window_len+2))          +   (env_len-ali_len)            * log((float)window_len / (window_len+2));
+
+     /* note: this bitscore was computed under a model with length of
+      * env_len (jenv-ienv+1). Here, the score is modified (reduced) by
+      * treating the hit as though it came from a window of length
+      * om->max_length. To do this:
+      */
+
+      // (1) the entrance/exit costs are shifted from env_len to max_length:
+      bitscore -= 2 * log(2. / (env_len+2)) ;
       bitscore += 2 * log(2. / (om->max_length+2)) ;
-      //the ESL_MAX test handles the extremely rare case that the env_len is actually larger than om->max_length
+
+      // (2) the extension cost for going from ali bounds to env bounds is removed,
+      // and replaced with the cost of going from ali bounds to max length (or env
+      // bounds in the extremely rare case that the env_len is actually larger than om->max_length).
+      bitscore -=  (env_len-ali_len)                            * log((float)env_len / (env_len+2));
       bitscore +=  (ESL_MAX(om->max_length, env_len) - ali_len) * log((float)om->max_length / (float) (om->max_length+2));
 
-      /*compute scores used to decide if we should keep this "domain" as a hit.
-       *
-       * Apply an ad hoc log(omega) fudge factor penalty; interpreted as a prior,
-       * saying that this null model is <omega> as likely as the standard null model.
-       * <omega> is by default 1/(2^8), so this is by default an 8 bit penalty.
+      /* Compute scores used to decide if we should keep this "domain" as a hit.
+       * Note that the bias correction was captured in dom->domcorrection during
+       * the p7_domaindef_ByPosteriorHeuristics() call.
        */
-      dom_bias   = (pli->do_null2 ? p7_FLogsum(0.0, log(bg->omega) + dom->domcorrection) : 0.0);
-      dom_score  = (bitscore - (nullsc + dom_bias))  / eslCONST_LOG2;
+      dom_bias   = dom->domcorrection;
+      p7_bg_SetLength(bg, ESL_MAX(om->max_length, env_len));
+      p7_bg_NullOne  (bg, subseq, ESL_MAX(om->max_length, env_len), &nullsc);
+      dom_score  = (bitscore - (nullsc))  / eslCONST_LOG2;
       dom_lnP   = esl_exp_logsurv(dom_score, om->evparam[p7_FTAU], om->evparam[p7_FLAMBDA]);
 
       //note: this test is conservative:
@@ -1309,7 +1132,13 @@ p7_pli_postViterbi_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_T
       if (pli->mode == p7_SCAN_MODELS)  nres = ESL_MIN(window_len,om->max_length);
       else                              nres = pli->nres;
 
-      if ( p7_pli_TargetReportable(pli, dom_score, dom_lnP + log((float)nres / om->max_length) ) ) {
+      if ( !p7_pli_TargetReportable(pli, dom_score, dom_lnP + log((float)nres / om->max_length) ) ) {
+
+        p7_alidisplay_Destroy(dom->ad);
+
+      } else {
+
+        p7_pli_computeAliScores(dom, subseq, data, om->abc->Kp);
 
         p7_tophits_CreateNextHit(hitlist, &hit);
 
@@ -1323,24 +1152,24 @@ p7_pli_postViterbi_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_T
         ESL_ALLOC(hit->dcl, sizeof(P7_DOMAIN) );
         hit->dcl[0] = pli->ddef->dcl[d];
 
-        if (complementarity == fm_nocomplement) {
-          hit->dcl[0].ienv += window_start - 1; // represents the real position within the sequence handed to the pipeline
-          hit->dcl[0].jenv += window_start - 1;
-          hit->dcl[0].iali += window_start - 1;
-          hit->dcl[0].jali += window_start - 1;
-          hit->dcl[0].ad->sqfrom += window_start - 1;
-          hit->dcl[0].ad->sqto += window_start - 1;
+        hit->dcl[0].ad->L = seq_len;
+
+        // compute the real positions within the sequence handed to the pipeline
+        if (complementarity == p7_NOCOMPLEMENT) {
+          hit->dcl[0].ienv       += seq_start + window_start - 2;
+          hit->dcl[0].jenv       += seq_start + window_start - 2;
+          hit->dcl[0].iali       += seq_start + window_start - 2;
+          hit->dcl[0].jali       += seq_start + window_start - 2;
+          hit->dcl[0].ad->sqfrom += seq_start + window_start - 2;
+          hit->dcl[0].ad->sqto   += seq_start + window_start - 2;
         } else {
-
-          hit->dcl[0].ienv = window_start + window_len - 1 - hit->dcl[0].ienv + 1; // represents the real position within the sequence handed to the pipeline
-          hit->dcl[0].jenv = window_start + window_len - 1 - hit->dcl[0].jenv + 1;
-          hit->dcl[0].iali = window_start + window_len - 1 - hit->dcl[0].iali + 1;
-          hit->dcl[0].jali = window_start + window_len - 1 - hit->dcl[0].jali + 1;
-          hit->dcl[0].ad->sqfrom = window_start + window_len - 1 - hit->dcl[0].ad->sqfrom + 1;
-          hit->dcl[0].ad->sqto   = window_start + window_len - 1 - hit->dcl[0].ad->sqto + 1;
+          hit->dcl[0].ienv       = seq_start - (window_start + hit->dcl[0].ienv) + 2;
+          hit->dcl[0].jenv       = seq_start - (window_start + hit->dcl[0].jenv) + 2;
+          hit->dcl[0].iali       = seq_start - (window_start + hit->dcl[0].iali) + 2;
+          hit->dcl[0].jali       = seq_start - (window_start + hit->dcl[0].jali) + 2;
+          hit->dcl[0].ad->sqfrom = seq_start - (window_start + hit->dcl[0].ad->sqfrom) + 2;
+          hit->dcl[0].ad->sqto   = seq_start - (window_start + hit->dcl[0].ad->sqto) + 2;
         }
-
-
         hit->pre_score = bitscore  / eslCONST_LOG2;
         hit->pre_lnP   = esl_exp_logsurv (hit->pre_score,  om->evparam[p7_FTAU], om->evparam[p7_FLAMBDA]);
 
@@ -1359,7 +1188,6 @@ p7_pli_postViterbi_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_T
           if ((status  = esl_strdup(om->acc,  -1, &(hit->acc)))   != eslOK) esl_fatal("allocation failure");
           if ((status  = esl_strdup(om->desc, -1, &(hit->desc)))  != eslOK) esl_fatal("allocation failure");
         }
-
 
 
         /* If using model-specific thresholds, filter now.  See notes in front
@@ -1397,39 +1225,42 @@ ERROR:
 }
 
 
-/* Function:  p7_pli_postMSV_LongTarget()
+/* Function:  p7_pli_postSSV_LongTarget()
  * Synopsis:  the part of the LongTarget P7 search Pipeline downstream
- *            of the MSV filter
+ *            of the SSV filter
  *
- * Purpose:   This is called by either the standard (SIMD-MSV) long-target
+ * Purpose:   This is called by either the standard (SIMD-SSV) long-target
  *            pipeline (p7_Pipeline_LongTarget) or the FM-index long-target
  *            pipeline (p7_Pipeline_FM), and runs the post-MSV part of H3's
- *            accelerated pipeline to compare profile <om> against
- *            sequence <sq>. If a significant hit is found,
- *            information about it is added to the <hitlist>.
- *            The pipeline accumulates beancounting information
- *            about how many comparisons (and residues) flow through
- *            the pipeline while it's active.
+ *            accelerated pipeline to compare profile <om> against sequence
+ *            <sq>. If a significant hit is found (within the function
+ *            p7_pipeline_postViterbi_LongTarget(), called in this function),
+ *            information about it is added to the <hitlist>. The pipeline
+ *            accumulates beancounting information about how many comparisons
+ *            and residues flow through the pipeline while it's active.
  *
  * Args:      pli             - the main pipeline object
  *            om              - optimized profile (query)
  *            bg              - background model
  *            hitlist         - pointer to hit storage bin
- *            data         - for computing windows based on maximum prefix/suffix extensions
+ *            data            - for computing windows based on maximum prefix/suffix extensions
  *            seqidx          - the id # of the sequence from which the current window was extracted
  *            window_start    - the starting position of the extracted window (offset from the first
  *                              position of the block of a possibly longer sequence)
  *            window_len      - the length of the extracted window
- *            tmpseq          - a new or reused digital sequence object used for "domain" definition
  *            subseq          - digital sequence of the extracted window
  *            seq_start       - first position of the sequence block passed in to the calling pipeline function
  *            seq_name        - name of the sequence the window comes from
  *            seq_source      - source of the sequence the window comes from
  *            seq_acc         - acc of the sequence the window comes from
  *            seq_desc        - desc of the sequence the window comes from
+ *            seq_len         - length of the sequence the window comes from (only FM will have it; otherwise, 0 and ignored)
  *            nullsc          - score of the passed window vs the bg model
  *            usc             - msv score of the passed window
  *            complementarity - boolean; is the passed window sourced from a complementary sequence block
+ *            vit_windowlist  - initialized window list, in which viterbi-passing hits are captured
+ *            pli_tmp         - a collection of objects used in the long target pipeline that should be
+ *                              (and are) only allocated once per pipeline to minimize alloc overhead.
  *
  * Returns:   <eslOK> on success. If a significant hit is obtained,
  *            its information is added to the growing <hitlist>.
@@ -1445,11 +1276,11 @@ ERROR:
  *
  */
 static int
-p7_pli_postMSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHITS *hitlist, const P7_SCOREDATA *data,
-    int64_t seqidx, int window_start, int window_len, ESL_SQ *tmpseq,
-    ESL_DSQ *subseq, int seq_start, char *seq_name, char *seq_source, char* seq_acc, char* seq_desc,
+p7_pli_postSSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHITS *hitlist, const P7_SCOREDATA *data,
+    int64_t seqidx, int window_start, int window_len, ESL_DSQ *subseq,
+    int seq_start, char *seq_name, char *seq_source, char* seq_acc, char* seq_desc, int seq_len,
     float nullsc, float usc, int complementarity, P7_HMM_WINDOWLIST *vit_windowlist,
-    float *bgf_arr, float *scores_arr, float *fwd_emissions_arr
+    P7_PIPELINE_LONGTARGET_OBJS *pli_tmp
 )
 {
   float            filtersc;           /* HMM null filter score                   */
@@ -1468,7 +1299,6 @@ p7_pli_postMSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHI
 
   int F1_L = ESL_MIN( window_len,  pli->B1);
   int F2_L = ESL_MIN( window_len,  pli->B2);
-
 
   //initial bias filter, based on the input window_len
   if (pli->do_biasfilter) {
@@ -1507,7 +1337,7 @@ p7_pli_postMSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHI
   //use window_len instead of loc_window_len, because length parameterization is done, just need to loop over subseq
   p7_ViterbiFilter_longtarget(subseq, window_len, om, pli->oxf, filtersc, pli->F2, vit_windowlist);
 
-  p7_pli_ExtendAndMergeWindows (om, data, vit_windowlist, window_len, 0.5);
+  p7_pli_ExtendAndMergeWindows (om, data, vit_windowlist, 0.5);
 
 
   // if a window is still too long (>80Kb), need to split it up to
@@ -1515,8 +1345,6 @@ p7_pli_postMSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHI
   for (i=0; i<vit_windowlist->count; i++) {
 
       if (vit_windowlist->windows[i].length > max_window_len) {
-         //fprintf(stderr, "shockingly long window (%d, %d)\n", vit_windowlist->windows[i].n, vit_windowlist->windows[i].length);
-
          //modify the current window to restrict length to 40K, then add
          //new windows with max length 40K, and MAXL overlap w/ preceding window
          new_n   = vit_windowlist->windows[i].n ;
@@ -1526,10 +1354,11 @@ p7_pli_postMSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHI
          do {
            new_n   +=  (smaller_window_len - om->max_length);
            new_len -=  (smaller_window_len - om->max_length);
-           p7_hmmwindow_new(vit_windowlist, 0, new_n, 0, 0, ESL_MIN(smaller_window_len,new_len), 0.0, fm_nocomplement );
+           p7_hmmwindow_new(vit_windowlist, 0, new_n, 0, 0, ESL_MIN(smaller_window_len,new_len), 0.0, p7_NOCOMPLEMENT, new_len );
          } while (new_len > smaller_window_len);
       }
   }
+
 
   overlap = 0;
   for (i=0; i<vit_windowlist->count; i++) {
@@ -1539,11 +1368,13 @@ p7_pli_postMSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHI
       pli->pos_past_vit -= ESL_MAX(0,  vit_windowlist->windows[i-1].n + vit_windowlist->windows[i-1].length - vit_windowlist->windows[i].n );
 
     p7_pli_postViterbi_LongTarget(pli, om, bg, hitlist, data, seqidx,
-        window_start+vit_windowlist->windows[i].n-1, vit_windowlist->windows[i].length, tmpseq,
+        window_start+vit_windowlist->windows[i].n-1, vit_windowlist->windows[i].length,
         subseq + vit_windowlist->windows[i].n - 1,
-        seq_start, seq_name, seq_source, seq_acc, seq_desc, complementarity, &overlap,
-        bgf_arr, scores_arr, fwd_emissions_arr
+        seq_start, seq_name, seq_source, seq_acc, seq_desc, seq_len, complementarity, &overlap,
+        pli_tmp
     );
+
+
 
     if (overlap == -1 && i<vit_windowlist->count-1) {
       overlap = ESL_MAX(0,  vit_windowlist->windows[i].n + vit_windowlist->windows[i].length - vit_windowlist->windows[i+1].n );
@@ -1552,8 +1383,6 @@ p7_pli_postMSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHI
       overlap = 0;
     }
 
-    //pli->ddef->dcl = NULL; // we've handed the alidisplays to hitlist
-    //p7_domaindef_Reuse(pli->ddef);
     pli->ddef->ndom = 0;
 
   }
@@ -1567,17 +1396,23 @@ p7_pli_postMSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHI
 
 
 /* Function:  p7_Pipeline_LongTarget()
- * Synopsis:  HMMER3's accelerated seq/profile comparison pipeline, modified to use the scanning MSV/SSV filters.
+ * Synopsis:  Accelerated seq/profile comparison pipeline for long target sequences.
  *
- * Purpose:   Run H3's accelerated pipeline to compare profile <om>
+ * Purpose:   Run HMMER's accelerated pipeline to compare profile <om>
  *            against sequence <sq>. If a significant hit is found,
- *            information about it is added to the <hitlist>.
- *            This is a variant of p7_Pipeline that runs the
- *            versions of the MSV/SSV filters that scan a long
- *            sequence and find high-scoring regions (windows), then pass 
- *            those to the remainder of the pipeline. The pipeline
- *            accumulates beancounting information about how many comparisons
- *            flow through the pipeline while it's active.
+ *            information about it is added to the <hitlist>. This is
+ *            a variant of p7_Pipeline that runs one of two
+ *            alternative SSV filters
+ *              (1) the scanning SSV filter (p7_SSVFilter_longtarget) that scans
+ *              a long sequence and finds high-scoring regions (windows), or
+ *              (2) the FM-index-based SSV filter that finds modest-scoring
+ *              diagonals using the FM-index, and extends them to maximum-
+ *              scoring diagonals subjected to the SSV filter thresholds
+ *
+ *            Windows passing the appropriate SSV filter are then passed
+ *            to the remainder of the pipeline. The pipeline accumulates
+ *            bean counting information about how many comparisons and
+ *            residues flow through the pipeline while it's active.
  *
  * Returns:   <eslOK> on success. If a significant hit is obtained,
  *            its information is added to the growing <hitlist>.
@@ -1588,39 +1423,67 @@ p7_pli_postMSV_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_BG *bg, P7_TOPHI
  *
  *            <eslERANGE> on numerical overflow errors in the
  *            optimized vector implementations; particularly in
- *            posterior decoding. I don't believe this is possible for
- *            multihit local models, but I'm set up to catch it
+ *            posterior decoding. We don't believe this is possible for
+ *            multihit local models, but we're set up to catch it
  *            anyway. We may emit a warning to the user, but cleanly
  *            skip the problematic sequence and continue.
  *
- * Throws:    <eslEMEM> on allocation failure.
+ * Args:      pli             - the main pipeline object
+ *            om              - optimized profile (query)
+ *            data            - for computing diagonals, and picking window edges based
+ *                              on maximum prefix/suffix extensions
+ *            bg              - background model
+ *            hitlist         - pointer to hit storage bin (already allocated)
  *
- * Xref:      J4/25.
+ *            :: the next three values are assigned if a standard sequence database is being used. If FM database is used, they are ignored
+ *            seqidx          - the id # of the sequence from which the current window was extracted
+ *            sq              - digital sequence of the window
+ *            complementarity - is <sq> from the top strand (p7_NOCOMPLEMENT), or bottom strand (P7_COMPLEMENT)
+ *
+ *            :: the next three are assigned if an FM database is being used. If standard sequence is used, they are set to NULL.
+ *            fmf             - the FM_DATA for forward-strand search
+ *            fmb             - the FM_DATA for reverse-strand (complement) search
+ *            fm_cfg          - general FM configuration
+ *
+ * Throws:    <eslEMEM> on allocation failure.
  */
 int
-p7_Pipeline_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_SCOREDATA *data, P7_BG *bg, const ESL_SQ *sq, P7_TOPHITS *hitlist, int64_t seqidx)
+p7_Pipeline_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_SCOREDATA *data,
+                        P7_BG *bg, P7_TOPHITS *hitlist,
+                        int64_t seqidx, const ESL_SQ *sq, int complementarity,
+                        const FM_DATA *fmf, const FM_DATA *fmb, FM_CFG *fm_cfg
+                        )
 {
   int              i;
   int              status;
   float            nullsc;   /* null model score                        */
   float            usc;      /* msv score  */
   float            P;
-  ESL_DSQ          *subseq;
-  ESL_SQ           *tmpseq   = NULL;
   float            bias_filtersc;
 
-  float            *bgf_arr  = NULL;
-  float            *scores_arr = NULL;
-  float            *fwd_emissions_arr = NULL;
+  ESL_DSQ          *subseq;
+  FM_SEQDATA       *seqdata;
+  uint32_t         seq_start;
 
   P7_HMM_WINDOWLIST msv_windowlist;
   P7_HMM_WINDOWLIST vit_windowlist;
+  P7_HMM_WINDOW     window;
+  FM_SEQDATA        seq_data;
 
-  if (sq->n == 0) return eslOK;    /* silently skip length 0 seqs; they'd cause us all sorts of weird problems */
+  P7_PIPELINE_LONGTARGET_OBJS *pli_tmp;
 
-  ESL_ALLOC(bgf_arr,   (om->abc->K)*sizeof(float));
-  ESL_ALLOC(scores_arr, (om->abc->Kp)*4*sizeof(float));
-  ESL_ALLOC(fwd_emissions_arr, sizeof(float) *  om->abc->Kp * (om->M+1));
+
+  if ((sq && (sq->n == 0)) || (fmf && (fmf->N == 0))) return eslOK;    /* silently skip length 0 seqs; they'd cause us all sorts of weird problems */
+
+  if (fm_cfg)
+    seqdata = fm_cfg->meta->seq_data;
+
+  ESL_ALLOC(pli_tmp, sizeof(P7_PIPELINE_LONGTARGET_OBJS));
+  pli_tmp->bg = p7_bg_Clone(bg);
+  pli_tmp->om = p7_oprofile_Create(om->M, om->abc);
+  ESL_ALLOC(pli_tmp->scores, sizeof(float) * om->abc->Kp * 4);
+  ESL_ALLOC(pli_tmp->fwd_emissions_arr, sizeof(float) *  om->abc->Kp * (om->M+1));
+
 
   msv_windowlist.windows = NULL;
   vit_windowlist.windows = NULL;
@@ -1637,217 +1500,129 @@ p7_Pipeline_LongTarget(P7_PIPELINE *pli, P7_OPROFILE *om, P7_SCOREDATA *data, P7
    * This variant of SSV will scan a long sequence and find
    * short high-scoring regions.
    */
-  p7_MSVFilter_longtarget(sq->dsq, sq->n, om, pli->oxf, data, bg, pli->F1, &msv_windowlist);
+  if (fmf) // using an FM-index
+    p7_SSVFM_longlarget(om /*, (P7_GMX*)(pli->oxf)*/, 2.0, bg, pli->F1, fmf, fmb, fm_cfg, data, &msv_windowlist );
+  else // compare directly to sequence
+    p7_SSVFilter_longtarget(sq->dsq, sq->n, om, pli->oxf, data, bg, pli->F1, &msv_windowlist);
 
-  /* convert hits to windows, possibly filtering based on composition bias,
-   * definitely merging neighboring windows, and
-   * TODO: splitting overly-large windows
+
+
+
+  /* convert hits to windows, merging neighboring windows, and
    */
   if ( msv_windowlist.count > 0 ) {
-
-    /* In scan mode, if it passes the MSV filter, read the rest of the profile */
-    if (pli->hfp)
+    /* In scan mode, if it passes the MSV filter, read the rest of the profile
+     * Not necessary for dummy mode, where the ->base_w variable checks cause compilation failure*/
+#ifndef P7_IMPL_DUMMY_INCLUDED
+    if (!fmf && pli->hfp)
     {
-      p7_oprofile_ReadRest(pli->hfp, om);
-      if ((status = p7_pli_NewModelThresholds(pli, om)) != eslOK) goto ERROR;
-    }
-
-    if (data->prefix_lengths == NULL) { //otherwise, already filled in
-      p7_hmm_ScoreDataComputeRest(om, data);
-    }
-
-    /*
-    //filter for biased composition of diagonals here ?
-    if (pli->do_biasfilter) {
-      j = 0;
-      for (i=0; i<windowlist.count; i++) {
-        curr_window = windowlist.windows + i;
-        p7_bg_FilterScore(bg, sq->dsq + curr_window->n-1, curr_window->length, &bias_sc);
-        bias_sc = (curr_window->score - bias_sc) / eslCONST_LOG2;
-        biasP = esl_gumbel_surv(bias_sc,  om->evparam[p7_MMU],  om->evparam[p7_MLAMBDA]);
-
-        if (biasP <= pli->F1 ) { // keep it
-          windowlist.windows[j] = windowlist.windows[i];
-          j++;
-        }
+      if (om->base_w == 0 &&  om->scale_w == 0) { // we haven't already read this hmm (if we're on the second strand, we would've)
+        p7_oprofile_ReadRest(pli->hfp, om);
+        if ((status = p7_pli_NewModelThresholds(pli, om)) != eslOK) goto ERROR;
       }
-      windowlist.count = j;
     }
-*/
-    p7_pli_ExtendAndMergeWindows (om, data, &msv_windowlist, sq->n, 0);
+#endif
+
+    p7_oprofile_GetFwdEmissionArray(om, bg, pli_tmp->fwd_emissions_arr);
+
+    if (data->prefix_lengths == NULL)  //otherwise, already filled in
+      p7_hmm_ScoreDataComputeRest(om, data);
 
 
-  /*
-   * pass each remaining window on to the remaining pipeline
-   */
+    p7_pli_ExtendAndMergeWindows (om, data, &msv_windowlist, 0);
+
+  /* Pass each remaining window on to the remaining pipeline */
     p7_hmmwindow_init(&vit_windowlist);
-    tmpseq = esl_sq_CreateDigital(sq->abc);
+    pli_tmp->tmpseq = esl_sq_CreateDigital(om->abc);
+    if (!fmf )
+      free (pli_tmp->tmpseq->dsq);  //this ESL_SQ object is just a container that'll point to a series of other DSQs, so free the one we just created inside the larger SQ object
+
     for (i=0; i<msv_windowlist.count; i++){
-      int window_len = msv_windowlist.windows[i].length;
+      window =  msv_windowlist.windows[i] ;
 
-      subseq = sq->dsq + msv_windowlist.windows[i].n - 1;
-      p7_bg_SetLength(bg, window_len);
-      p7_bg_NullOne  (bg, subseq, window_len, &nullsc);
+      if (fmf) {
+        fm_convertRange2DSQ( fmf, fm_cfg->meta, window.fm_n, window.length, window.complementarity, pli_tmp->tmpseq );
+        subseq = pli_tmp->tmpseq->dsq;
+      } else {
+        subseq = sq->dsq + window.n - 1;
+      }
 
+      p7_bg_SetLength(bg, window.length);
+      p7_bg_NullOne  (bg, subseq, window.length, &nullsc);
 
-      p7_bg_FilterScore(bg, subseq, window_len, &bias_filtersc);
-
+      p7_bg_FilterScore(bg, subseq, window.length, &bias_filtersc);
       // Compute standard MSV to ensure that bias doesn't overcome SSV score when MSV
       // would have survived it
-      p7_oprofile_ReconfigMSVLength(om, window_len);
-      p7_MSVFilter(subseq, window_len, om, pli->oxf, &usc);
-
+      p7_oprofile_ReconfigMSVLength(om, window.length);
+      p7_MSVFilter(subseq, window.length, om, pli->oxf, &usc);
       P = esl_gumbel_surv( (usc-nullsc)/eslCONST_LOG2,  om->evparam[p7_MMU],  om->evparam[p7_MLAMBDA]);
       if (P > pli->F1 ) continue;
 
-      pli->pos_past_msv += window_len;
+      pli->pos_past_msv += window.length;
 
-      status = p7_pli_postMSV_LongTarget(pli, om, bg, hitlist, data, seqidx, msv_windowlist.windows[i].n, window_len, tmpseq,
-                        subseq, sq->start, sq->name, sq->source, sq->acc, sq->desc, nullsc, usc, fm_nocomplement, &vit_windowlist,
-                        bgf_arr, scores_arr, fwd_emissions_arr
-      );
+      if (fmf) {
+        seq_data = fm_cfg->meta->seq_data[window.id];
+        seq_start =  seq_data.start;
+        if (window.complementarity == p7_COMPLEMENT)
+          seq_start += seq_data.length - 1;
+      }
 
+      status = p7_pli_postSSV_LongTarget(pli, om, bg, hitlist, data,
+            (fmf != NULL ? seq_data.id  : seqidx),
+            window.n, window.length, subseq,
+            (fmf != NULL ? seq_start       : sq->start),
+            (fmf != NULL ? seq_data.name   : sq->name),
+            (fmf != NULL ? seq_data.source : sq->source),
+            (fmf != NULL ? seq_data.acc    : sq->acc),
+            (fmf != NULL ? seq_data.desc   : sq->desc),
+            (fmf != NULL ? seq_data.length : -1),
+            nullsc,
+            usc,
+            (fmf != NULL ? window.complementarity : complementarity),
+            &vit_windowlist,
+            pli_tmp
+        );
 
-
-      if (status != eslOK) goto ERROR;
+        if (status != eslOK) goto ERROR;
 
     }
 
-    esl_sq_Destroy(tmpseq);
+    if (fmf)  free (pli_tmp->tmpseq->dsq);
+
+    pli_tmp->tmpseq->dsq = NULL;  //it's a pointer to a dsq object belonging to another sequence
+
+    esl_sq_Destroy(pli_tmp->tmpseq);
     free (vit_windowlist.windows);
   }
 
+
+
   if (msv_windowlist.windows != NULL) free (msv_windowlist.windows);
 
-
-  if (bgf_arr != NULL)           free (bgf_arr);
-  if (scores_arr != NULL)        free (scores_arr);
-  if (fwd_emissions_arr != NULL) free (fwd_emissions_arr);
+  if (pli_tmp != NULL) {
+    if (pli_tmp->bg != NULL)     p7_bg_Destroy(pli_tmp->bg);
+    if (pli_tmp->om != NULL)     p7_oprofile_Destroy(pli_tmp->om);
+    if (pli_tmp->scores != NULL)        free (pli_tmp->scores);
+    if (pli_tmp->fwd_emissions_arr != NULL) free (pli_tmp->fwd_emissions_arr);
+    free(pli_tmp);
+  }
 
   return eslOK;
 
 ERROR:
-  if (tmpseq != NULL) esl_sq_Destroy(tmpseq);
   if (msv_windowlist.windows != NULL) free (msv_windowlist.windows);
   if (vit_windowlist.windows != NULL) free (vit_windowlist.windows);
 
-  if (bgf_arr != NULL)           free (bgf_arr);
-  if (scores_arr != NULL)        free (scores_arr);
-  if (fwd_emissions_arr != NULL) free (fwd_emissions_arr);
-
-  return status;
-
-}
-
-
-
-
-
-/* Function:  p7_Pipeline_FM()
- * Synopsis:  HMMER3's accelerated seq/profile comparison pipeline, using FM-index.
- *
- * Purpose:   Using FM-index, find high-scoring MSV windows, then
- *            pass these windows on to later pipeline stages. This
- *            pipeline compares profile <om> against the FM-index
- *            to find seeds, then extends those seeds to MSV-passing
- *            diagonals by comparing agasint the sequence associated
- *            with that window. If a significant hit is found,
- *            information about it is added to the <hitlist>. The
- *            pipeline accumulates beancounting information about how
- *            many comparisons flow through the pipeline while it's active.
- *
- * Returns:   <eslOK> on success. If a significant hit is obtained,
- *            its information is added to the growing <hitlist>.
- *
- *            <eslEINVAL> if (in a scan pipeline) we're supposed to
- *            set GA/TC/NC bit score thresholds but the model doesn't
- *            have any.
- *
- *            <eslERANGE> on numerical overflow errors in the
- *            optimized vector implementations; particularly in
- *            posterior decoding. I don't believe this is possible for
- *            multihit local models, but I'm set up to catch it
- *            anyway. We may emit a warning to the user, but cleanly
- *            skip the problematic sequence and continue.
- *
- * Throws:    <eslEMEM> on allocation failure.
- *
- * Xref:      J4/25.
- */
-int
-p7_Pipeline_FM(P7_PIPELINE *pli, P7_OPROFILE *om, P7_SCOREDATA *data, P7_BG *bg,
-    P7_TOPHITS *hitlist, int64_t seqidx, const FM_DATA *fmf, const FM_DATA *fmb, FM_CFG *fm_cfg)
-{
-
-  int i;
-  int status;
-  ESL_SQ           *tmpseq;
-  ESL_DSQ          *subseq;
-  P7_HMM_WINDOW     window;
-  P7_HMM_WINDOWLIST windowlist;
-  FM_SEQDATA       *seqdata;
-  float            *bgf_arr  = NULL;
-  float            *scores_arr = NULL;
-  float            *fwd_emissions_arr = NULL;
-
-  ESL_ALLOC(bgf_arr,   (om->abc->K)*sizeof(float));
-  ESL_ALLOC(scores_arr, (om->abc->Kp)*4*sizeof(float));
-  ESL_ALLOC(fwd_emissions_arr, sizeof(float) *  om->abc->Kp * (om->M+1));
-
-  tmpseq = esl_sq_CreateDigital(om->abc);
-
-  if (fmf->N == 0) return eslOK;    /* silently skip length 0 seqs; they'd cause us all sorts of weird problems */
-
-  p7_hmmwindow_init(&windowlist);
-
-  seqdata = fm_cfg->meta->seq_data;
-
-  p7_omx_GrowTo(pli->oxf, om->M, 0, 0);    /* expand the one-row omx if needed */
-
-
-  /* First level filter: the MSV filter, multihit with <om>.
-   * This variant of MSV will scan a long sequence and find
-   * short high-scoring regions.
-   * */
-  p7_FM_MSV(om, (P7_GMX*)(pli->oxf), 2.0, bg, pli->F1,
-             fmf, fmb, fm_cfg, data, &windowlist );
-
-  for (i=0; i<windowlist.count; i++){
-
-    window =  windowlist.windows[i] ;
-
-    fm_convertRange2DSQ( fm_cfg->meta, window.id, window.fm_n, window.length, fmf->T, tmpseq );
-
-
-    if (window.complementarity == fm_complement)
-      esl_sq_ReverseComplement(tmpseq);
-
-    subseq = tmpseq->dsq;  // so subseq is just a pointer to tmpseq's dsq
-
-    pli->n_past_msv++;
-    pli->pos_past_msv += window.length;
-    p7_oprofile_ReconfigMSVLength(om, window.length);
-
-    status = p7_pli_postMSV_LongTarget(pli, om, bg, hitlist, data, seqidx, window.n, window.length, tmpseq,
-                      subseq, 1, seqdata[window.id].name, seqdata[window.id].source,
-                      seqdata[window.id].acc, seqdata[window.id].desc,
-                      window.null_sc, window.score, window.complementarity,
-                      NULL, bgf_arr, scores_arr, fwd_emissions_arr
-                      );
-
-    if (status != eslOK) return status;
-
-    pli->ddef->ndom = 0; // reset for next use
-
+  if (pli_tmp != NULL) {
+    if (pli_tmp->tmpseq != NULL) esl_sq_Destroy(pli_tmp->tmpseq);
+    if (pli_tmp->bg != NULL)     p7_bg_Destroy(pli_tmp->bg);
+    if (pli_tmp->om != NULL)     p7_oprofile_Destroy(pli_tmp->om);
+    if (pli_tmp->scores != NULL)        free (pli_tmp->scores);
+    if (pli_tmp->fwd_emissions_arr != NULL) free (pli_tmp->fwd_emissions_arr);
+    free(pli_tmp);
   }
 
-  esl_sq_Destroy(tmpseq);
-  free(windowlist.windows);
-
-  return eslOK;
-
-ERROR:
-  return eslEMEM;
+  return status;
 
 }
 
@@ -1872,17 +1647,17 @@ p7_pli_Statistics(FILE *ofp, P7_PIPELINE *pli, ESL_STOPWATCH *w)
   fprintf(ofp, "Internal pipeline statistics summary:\n");
   fprintf(ofp, "-------------------------------------\n");
   if (pli->mode == p7_SEARCH_SEQS) {
-    fprintf(ofp,   "Query model(s):      %15" PRId64 "  (%" PRId64 " nodes)\n",     pli->nmodels, pli->nnodes);
-    fprintf(ofp,   "Target sequences:    %15" PRId64 "  (%" PRId64 " residues searched)\n",  pli->nseqs,   pli->nres);
+    fprintf(ofp, "Query model(s):                %15" PRId64 "  (%" PRId64 " nodes)\n",     pli->nmodels, pli->nnodes);
+    fprintf(ofp, "Target sequences:              %15" PRId64 "  (%" PRId64 " residues searched)\n",  pli->nseqs,   pli->nres);
     ntargets = pli->nseqs;
   } else {
-    fprintf(ofp, "Query sequence(s):           %15" PRId64 "  (%" PRId64 " residues searched)\n",  pli->nseqs,   pli->nres);
-    fprintf(ofp, "Target model(s):             %15" PRId64 "  (%" PRId64 " nodes)\n",     pli->nmodels, pli->nnodes);
+    fprintf(ofp,   "Query sequence(s):           %15" PRId64 "  (%" PRId64 " residues searched)\n",  pli->nseqs,   pli->nres);
+    fprintf(ofp,   "Target model(s):             %15" PRId64 "  (%" PRId64 " nodes)\n",     pli->nmodels, pli->nnodes);
     ntargets = pli->nmodels;
   }
 
   if (pli->long_targets) {
-      fprintf(ofp, "Residues passing MSV filter:   %15" PRId64 "  (%.3g); expected (%.3g)\n",
+      fprintf(ofp, "Residues passing SSV filter:   %15" PRId64 "  (%.3g); expected (%.3g)\n",
       //fprintf(ofp, "Windows passing MSV filter:   %15" PRId64 "  (%.4g); expected (%.4g)\n",
           //pli->n_past_msv,
           pli->pos_past_msv,

@@ -25,7 +25,7 @@ SIMDFLAGS = @SIMD_CFLAGS@
 CPPFLAGS  = @CPPFLAGS@
 LDFLAGS   = @LDFLAGS@
 DEFS      = @DEFS@
-LIBS      = -lhmmer -leasel -ldivsufsort @LIBS@ @LIBGSL@ @PTHREAD_LIBS@ -lm
+LIBS      = -lhmmer -leasel -ldivsufsort  @LIBS@ @LIBGSL@ @PTHREAD_LIBS@ -lm
 MPILIBS   = @MPILIBS@
 
 AR        = @AR@ 
@@ -45,7 +45,6 @@ MYINCDIRS = -I../${ESLDIR} \
 
 
 PROGS = alimask\
-	exactmatch\
 	hmmalign\
 	hmmbuild\
 	hmmconvert\
@@ -63,7 +62,8 @@ PROGS = alimask\
 	nhmmscan\
 	hmmpgmd\
 	hmmc2\
-	makenhmmerdb
+	makehmmerdb\
+	hmmerfm-exactmatch
 
 
 PROGOBJS =\
@@ -86,7 +86,8 @@ PROGOBJS =\
 	nhmmscan.o\
 	hmmpgmd.o\
 	hmmc2.o\
-	makenhmmerdb.o\
+	makehmmerdb.o\
+	hmmerfm-exactmatch.o
 
 HDRS =  hmmer.h \
 	cachedb.h \
@@ -144,10 +145,11 @@ OBJS =  build.o\
 	p7_tophits.o\
 	p7_trace.o\
 	p7_scoredata.o\
+	hmmpgmd2msa.o\
 	fm_alphabet.o\
 	fm_general.o\
-	fm_msv.o\
-    hmmpgmd2msa.o
+	fm_sse.o\
+	fm_ssv.o
 #	island.o\
 
 STATS = \
@@ -186,7 +188,8 @@ UTESTS =\
 	p7_profile_utest\
 	p7_tophits_utest\
 	p7_trace_utest\
-	p7_scoredata_utest
+	p7_scoredata_utest\
+  hmmpgmd2msa_utest
 
 ITESTS = \
 	itest_brute
@@ -250,7 +253,7 @@ libhmmer-src.stamp: ${OBJS}
 ${OBJS}:     ${HDRS} p7_config.h  
 ${PROGOBJS}: ${HDRS} p7_config.h
 
-${PROGS}: @EXEC_DEPENDENCY@  libhmmer.a ../${ESLDIR}/libeasel.a  
+${PROGS}: @EXEC_DEPENDENCY@  libhmmer.a ../${ESLDIR}/libeasel.a 
 	${QUIET_GEN}${CC} ${CFLAGS} ${SIMDFLAGS} ${DEFS} ${LDFLAGS} ${MYLIBDIRS} -o $@ $@.o ${MPILIBS} ${LIBS}
 
 .c.o:

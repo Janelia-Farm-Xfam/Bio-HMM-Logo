@@ -1,9 +1,17 @@
-#include "hmmer.h"
-#include "impl_sse.h"
+#include "p7_config.h"
 
+#include <stdio.h>
+
+#include <xmmintrin.h>		/* SSE  */
+#include <emmintrin.h>		/* SSE2 */
+
+#include "easel.h"
+#include "esl_getopts.h"
+#include "hmmer.h"
 
 int
-fm_getbits_m128 (__m128i in, char *buf, int reverse) {
+fm_getbits_m128 (__m128i in, char *buf, int reverse) 
+{
   byte_m128 new;
   new.m128 = in;
   int i,j;
@@ -24,7 +32,8 @@ fm_getbits_m128 (__m128i in, char *buf, int reverse) {
 }
 
 int
-fm_print_m128 (__m128i in) {
+fm_print_m128 (__m128i in) 
+{
   char str[144];
   fm_getbits_m128(in, str, 0);
   fprintf (stderr, "%s\n", str);
@@ -33,7 +42,8 @@ fm_print_m128 (__m128i in) {
 
 
 int
-fm_print_m128_rev (__m128i in) {
+fm_print_m128_rev (__m128i in) 
+{
   char str[144];
   fm_getbits_m128(in, str, 1);
   fprintf (stderr, "%s\n", str);
@@ -45,7 +55,8 @@ fm_print_m128_rev (__m128i in) {
  * Purpose:   Initialize vector masks used in SSE FMindex implementation
  */
 int
-fm_initConfig( FM_CFG *cfg, ESL_GETOPTS *go ) {
+fm_configInit( FM_CFG *cfg, ESL_GETOPTS *go )
+{
   int status;
   int i,j;
   int trim_chunk_count;
@@ -149,20 +160,6 @@ ERROR:
 
 
 
-/* Function:  fm_destroyConfig()
- * Purpose:   Destroy vector masks used in SSE FMindex implementation
- */
-int
-fm_destroyConfig(FM_CFG *cfg ) {
-  if (cfg) {
-    if (cfg->fm_chars_mem)         free(cfg->fm_chars_mem);
-    if (cfg->fm_masks_mem)         free(cfg->fm_masks_mem);
-    if (cfg->fm_reverse_masks_mem) free(cfg->fm_reverse_masks_mem);
-    //free(cfg);
-  }
-  return eslOK;
-}
-
 /* Function:  fm_getOccCount()
  * Synopsis:  Compute number of occurrences of c in BWT[1..pos]
  *
@@ -182,28 +179,35 @@ fm_destroyConfig(FM_CFG *cfg ) {
  *            and certainly better space-utilization.
  */
 int
-fm_getOccCount (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c) {
+fm_getOccCount (const FM_DATA *fm, const FM_CFG *cfg, int pos, uint8_t c) {
 
   int i;
   FM_METADATA *meta = cfg->meta;
 
   int cnt;
-  const int b_pos          = (pos+1) >> meta->cnt_shift_b; //floor(pos/b_size)   : the b count element preceding pos
+  const int b_pos          = (pos+1) / meta->freq_cnt_b ; //floor(pos/b_size)   : the b count element preceding pos
   const uint16_t * occCnts_b  = fm->occCnts_b;
   const uint32_t * occCnts_sb = fm->occCnts_sb;
-  const int sb_pos         = (pos+1) >> meta->cnt_shift_sb; //floor(pos/sb_size) : the sb count element preceding pos
+  const int sb_pos         = (pos+1) / meta->freq_cnt_sb; //floor(pos/sb_size) : the sb count element preceding pos
 
 
   const int cnt_mod_mask_b = meta->freq_cnt_b - 1; //used to compute the mod function
   const int b_rel_pos      = (pos+1) & cnt_mod_mask_b; // pos % b_size      : how close is pos to the boundary corresponding to b_pos
-  const int up_b           = b_rel_pos>>(meta->cnt_shift_b - 1); //1 if pos is expected to be closer to the boundary of b_pos+1, 0 otherwise
-  const int landmark       = ((b_pos+up_b)<<(meta->cnt_shift_b)) - 1 ;
+  int up_b           = 2*b_rel_pos/meta->freq_cnt_b; //1 if pos is expected to be closer to the boundary of b_pos+1, 0 otherwise
+  int landmark       = ((b_pos+up_b)*meta->freq_cnt_b) - 1 ;
+
+  if (landmark >= fm->N) { // special case: for a count in the final block, just count from the bottom
+    up_b      = 0;
+    landmark  = (b_pos*(meta->freq_cnt_b)) - 1 ;
+  }
+
+
   // get the cnt stored at the nearest checkpoint
   cnt =  FM_OCC_CNT(sb, sb_pos, c );
 
   if (up_b)
     cnt += FM_OCC_CNT(b, b_pos + 1, c ) ;
-  else if ( b_pos !=  sb_pos * (1<<(meta->cnt_shift_sb - meta->cnt_shift_b)) )
+  else if ( b_pos !=  sb_pos * (meta->freq_cnt_sb / meta->freq_cnt_b) )
     cnt += FM_OCC_CNT(b, b_pos, c )  ;// b_pos has cumulative counts since the prior sb_pos - if sb_pos references the same count as b_pos, it'll doublecount
 
 
@@ -221,7 +225,7 @@ fm_getOccCount (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c) {
                          // Since I count from left or right, whichever is closer, this means
                          // we can support an occ_b interval of up to 4096 with guarantee of
                          // correctness.
-    if (meta->alph_type == fm_DNA) {
+    if (meta->alph_type == fm_DNA || meta->alph_type == fm_RNA) {
 
       if (!up_b) { // count forward, adding
         for (i=1+floor(landmark/4.0) ; i+15<( (pos+1)/4);  i+=16) { // keep running until i begins a run that shouldn't all be counted
@@ -254,7 +258,7 @@ fm_getOccCount (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c) {
         }
       }
 
-    } else if ( meta->alph_type == fm_DNA_full) {
+    } else if ( meta->alph_type == fm_DNA_full || meta->alph_type == fm_RNA_full) {
 
       if (!up_b) { // count forward, adding
         for (i=1+floor(landmark/2.0) ; i+15<( (pos+1)/2);  i+=16) { // keep running until i begins a run that shouldn't all be counted
@@ -287,8 +291,37 @@ fm_getOccCount (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c) {
           FM_COUNT_4BIT(tmp_v, tmp2_v, counts_v);
         }
       }
-    } else {
-      esl_fatal("Invalid alphabet type\n");
+    } else { //amino
+
+      if (!up_b) { // count forward, adding
+        for (i=1+landmark ; i+15<(pos+1);  i+=16) { // keep running until i begins a run that shouldn't all be counted
+          BWT_v    = *(__m128i*)(BWT+i);
+          BWT_v    = _mm_cmpeq_epi8(BWT_v, c_v);  // each byte is all 1s if matching, all zeros otherwise
+          counts_v = _mm_subs_epi8(counts_v, BWT_v); // adds 1 for each matching byte  (subtracting negative 1)
+        }
+        int remaining_cnt = pos + 1 -  i ;
+        if (remaining_cnt > 0) {
+          BWT_v    = *(__m128i*)(BWT+i);
+          BWT_v    = _mm_cmpeq_epi8(BWT_v, c_v);
+          BWT_v    = _mm_and_si128(BWT_v, *(cfg->fm_masks_v + remaining_cnt));// mask characters we don't want to count
+          counts_v = _mm_subs_epi8(counts_v, BWT_v);
+        }
+      } else { // count backwards, subtracting
+
+        for (i=landmark-15 ; i>pos;  i-=16) {
+          BWT_v = *(__m128i*)(BWT+i);
+          BWT_v    = _mm_cmpeq_epi8(BWT_v, c_v);  // each byte is all 1s if matching, all zeros otherwise
+          counts_v = _mm_subs_epi8(counts_v, BWT_v); // adds 1 for each matching byte  (subtracting negative 1)
+        }
+        int remaining_cnt = 16 - (pos + 1 - i);
+        if (remaining_cnt > 0) {
+          BWT_v = *(__m128i*)(BWT+i);
+          BWT_v    = _mm_cmpeq_epi8(BWT_v, c_v);
+          BWT_v     = _mm_and_si128(BWT_v, *(cfg->fm_reverse_masks_v + remaining_cnt));// mask characters we don't want to count
+          //tmp2_v    = _mm_and_si128(tmp2_v, *(cfg->fm_reverse_masks_v + (remaining_cnt+1)/2));
+          counts_v = _mm_subs_epi8(counts_v, BWT_v);
+        }
+      }
     }
 
     counts_v = _mm_xor_si128(counts_v, cfg->fm_neg128_v); //counts are stored in signed bytes, base -128. Move them to unsigned bytes
@@ -329,7 +362,7 @@ fm_getOccCount (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c) {
  *
  */
 int
-fm_getOccCountLT (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c, uint32_t *cnteq, uint32_t *cntlt) {
+fm_getOccCountLT (const FM_DATA *fm, const FM_CFG *cfg, int pos, uint8_t c, uint32_t *cnteq, uint32_t *cntlt) {
 
   if (c == 0 && pos >= fm->term_loc)// < 'A'?  cntlt depends on relationship of pos and the position where the '$' was replaced by 'A'
     *cntlt = 1;
@@ -339,17 +372,19 @@ fm_getOccCountLT (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c, uint32_t *
   FM_METADATA *meta = cfg->meta;
 
   int i,j;
-
-  const int b_pos          = (pos+1) >> meta->cnt_shift_b; //floor(pos/b_size)   : the b count element preceding pos
+  const int b_pos          = (pos+1) / meta->freq_cnt_b; //floor(pos/b_size)   : the b count element preceding pos
   const uint16_t * occCnts_b  = fm->occCnts_b;
   const uint32_t * occCnts_sb = fm->occCnts_sb;
-  const int sb_pos         = (pos+1) >> meta->cnt_shift_sb; //floor(pos/sb_size) : the sb count element preceding pos
+  const int sb_pos         = (pos+1) / meta->freq_cnt_sb; //floor(pos/sb_size) : the sb count element preceding pos
 
+  const int b_rel_pos      = (pos+1) % meta->freq_cnt_b; //  how close is pos to the boundary corresponding to b_pos
+  int up_b                 = 2*b_rel_pos/meta->freq_cnt_b; //1 if pos is expected to be closer to the boundary of b_pos+1, 0 otherwise
+  int landmark             = ((b_pos+up_b)*(meta->freq_cnt_b)) - 1 ;
 
-  const int cnt_mod_mask_b = meta->freq_cnt_b - 1; //used to compute the mod function
-  const int b_rel_pos      = (pos+1) & cnt_mod_mask_b; // pos % b_size      : how close is pos to the boundary corresponding to b_pos
-  const int up_b           = b_rel_pos>>(meta->cnt_shift_b - 1); //1 if pos is expected to be closer to the boundary of b_pos+1, 0 otherwise
-  const int landmark       = ((b_pos+up_b)<<(meta->cnt_shift_b)) - 1 ;
+  if (landmark >= fm->N) { // special case: for a count in the final block, just count from the bottom
+    up_b      = 0;
+    landmark  = (b_pos*(meta->freq_cnt_b)) - 1 ;
+  }
 
   // get the cnt stored at the nearest checkpoint
   *cnteq = FM_OCC_CNT(sb, sb_pos, c );
@@ -360,7 +395,7 @@ fm_getOccCountLT (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c, uint32_t *
     *cnteq += FM_OCC_CNT(b, b_pos + 1, c ) ;
     for (i=0; i<c; i++)
       *cntlt += FM_OCC_CNT(b, b_pos + 1, i ) ;
-  } else if ( b_pos !=  sb_pos * (1<<(meta->cnt_shift_sb - meta->cnt_shift_b)) ) {
+  } else if ( b_pos !=  sb_pos * (meta->freq_cnt_sb / meta->freq_cnt_b))  {
     *cnteq += FM_OCC_CNT(b, b_pos, c )  ;// b_pos has cumulative counts since the prior sb_pos - if sb_pos references the same count as b_pos, it'll doublecount
     for (i=0; i<c; i++)
       *cntlt += FM_OCC_CNT(b, b_pos, i ) ;
@@ -383,7 +418,7 @@ fm_getOccCountLT (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c, uint32_t *
                          // Since I count from left or right, whichever is closer, this means
                          // we can support an occ_b interval of up to 4096 with guarantee of
                          // correctness.
-    if (meta->alph_type == fm_DNA) {
+    if (meta->alph_type == fm_DNA || meta->alph_type == fm_RNA) {
 
       /* TODO: For 4-bit characters, it's easy to develop an alternative SSE function that will count
        *       instances <c in the same time as counting matches. I haven't yet identified a similar
@@ -455,7 +490,7 @@ fm_getOccCountLT (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c, uint32_t *
         }
       }
 
-    } else if ( meta->alph_type == fm_DNA_full) {
+    } else if ( meta->alph_type == fm_DNA_full || meta->alph_type == fm_RNA_full) {
       c_v = *(cfg->fm_chars_v + c);
 
       if (!up_b) { // count forward, adding
@@ -506,8 +541,50 @@ fm_getOccCountLT (const FM_DATA *fm, FM_CFG *cfg, int pos, uint8_t c, uint32_t *
 
         }
       }
-    } else {
-      esl_fatal("Invalid alphabet type\n");
+    } else { //amino
+      if (!up_b) { // count forward, adding
+        for (i=1+landmark ; i+15<(pos+1);  i+=16) { // keep running until i begins a run that shouldn't all be counted
+          BWT_v       = *(__m128i*)(BWT+i);
+          tmp_v       = _mm_cmplt_epi8(BWT_v, c_v);  // each byte is all 1s if leq, all zeros otherwise
+          counts_v_lt = _mm_subs_epi8(counts_v_lt, tmp_v); // adds 1 for each matching byte  (subtracting negative 1)
+          BWT_v       = _mm_cmpeq_epi8(BWT_v, c_v);  // each byte is all 1s if eq, all zeros otherwise
+          counts_v_eq = _mm_subs_epi8(counts_v_eq, BWT_v);
+        }
+        int remaining_cnt = pos + 1 -  i ;
+        if (remaining_cnt > 0) {
+          BWT_v       = *(__m128i*)(BWT+i);
+          tmp_v       = _mm_cmplt_epi8(BWT_v, c_v);  // each byte is all 1s if leq, all zeros otherwise
+          tmp_v       = _mm_and_si128(tmp_v, *(cfg->fm_masks_v + remaining_cnt/4));
+          counts_v_lt = _mm_subs_epi8(counts_v_lt, tmp_v); // adds 1 for each matching byte  (subtracting negative 1)
+
+          BWT_v       = _mm_cmpeq_epi8(BWT_v, c_v);
+          BWT_v       = _mm_and_si128(BWT_v, *(cfg->fm_masks_v + remaining_cnt/4));// mask characters we don't want to count
+          counts_v_eq = _mm_subs_epi8(counts_v_eq, BWT_v);
+        }
+
+      } else { // count backwards, subtracting
+        for (i=landmark-15 ; i>pos;  i-=16) {
+          BWT_v = *(__m128i*)(BWT+i);
+          tmp_v       = _mm_cmplt_epi8(BWT_v, c_v);  // each byte is all 1s if leq, all zeros otherwise
+          counts_v_lt = _mm_subs_epi8(counts_v_lt, tmp_v); // adds 1 for each matching byte  (subtracting negative 1)
+          BWT_v       = _mm_cmpeq_epi8(BWT_v, c_v);  // each byte is all 1s if eq, all zeros otherwise
+          counts_v_eq = _mm_subs_epi8(counts_v_eq, BWT_v);
+        }
+
+        int remaining_cnt = 16 - (pos + 1 - i);
+        if (remaining_cnt > 0) {
+          BWT_v = *(__m128i*)(BWT+i);
+          tmp_v       = _mm_cmplt_epi8(BWT_v, c_v);  // each byte is all 1s if leq, all zeros otherwise
+          tmp_v       = _mm_and_si128(tmp_v, *(cfg->fm_reverse_masks_v + remaining_cnt/4));
+          counts_v_lt = _mm_subs_epi8(counts_v_lt, tmp_v); // adds 1 for each matching byte  (subtracting negative 1)
+
+          BWT_v       = _mm_cmpeq_epi8(BWT_v, c_v);
+          BWT_v       = _mm_and_si128(tmp_v, *(cfg->fm_reverse_masks_v + remaining_cnt/4));// mask characters we don't want to count
+          //tmp2_v    = _mm_and_si128(tmp2_v, *(cfg->fm_reverse_masks_v + (remaining_cnt+1)/2));
+          counts_v_eq = _mm_subs_epi8(counts_v_eq, BWT_v);
+        }
+      }
+
     }
 
     counts_v_lt = _mm_xor_si128(counts_v_lt, cfg->fm_neg128_v); //counts are stored in signed bytes, base -128. Move them to unsigned bytes

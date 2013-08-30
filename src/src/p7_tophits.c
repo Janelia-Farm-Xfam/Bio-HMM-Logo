@@ -617,8 +617,10 @@ p7_tophits_Destroy(P7_TOPHITS *h)
       if (h->unsrt[i].acc  != NULL) free(h->unsrt[i].acc);
       if (h->unsrt[i].desc != NULL) free(h->unsrt[i].desc);
       if (h->unsrt[i].dcl  != NULL) {
-        for (j = 0; j < h->unsrt[i].ndom; j++)
-          if (h->unsrt[i].dcl[j].ad != NULL) p7_alidisplay_Destroy(h->unsrt[i].dcl[j].ad);
+        for (j = 0; j < h->unsrt[i].ndom; j++) {
+          if (h->unsrt[i].dcl[j].ad             != NULL) p7_alidisplay_Destroy(h->unsrt[i].dcl[j].ad);
+	  if (h->unsrt[i].dcl[j].scores_per_pos != NULL) free (h->unsrt[i].dcl->scores_per_pos);
+	}
         free(h->unsrt[i].dcl);
       }
     }
@@ -1257,9 +1259,9 @@ p7_tophits_Domains(FILE *ofp, P7_TOPHITS *th, P7_PIPELINE *pli, int textw)
    ------ ----- --------- ------- -------    --------- ---------    --------- ---------    --------- --------- ---------    ----
  !   82.7 104.4   4.9e-22     782     998 .. 241981174 241980968 .. 241981174 241980966 .. 241981174 241980968 234234233   0.78
         */
-        if (fprintf(ofp, "   %6s %5s %9s %9s %9s %2s %9s %9s %2s %9s %9s %9s %2s %4s\n",  "score",  "bias",  "  Evalue", "hmmfrom",  "hmm to", "  ", " alifrom ",  " ali to ", "  ",  " envfrom ",  " env to ",  "  sq len ", "  ",  "acc")  < 0)
+        if (fprintf(ofp, "   %6s %5s %9s %9s %9s %2s %9s %9s %2s %9s %9s    %9s %2s %4s\n",  "score",  "bias",  "  Evalue", "hmmfrom",  "hmm to", "  ", " alifrom ",  " ali to ", "  ",  " envfrom ",  " env to ",  (pli->mode == p7_SEARCH_SEQS ? "  sq len " : " mod len "), "  ",  "acc")  < 0)
           ESL_EXCEPTION_SYS(eslEWRITE, "domain hit list: write failed");
-        if (fprintf(ofp, "   %6s %5s %9s %9s %9s %2s %9s %9s %2s %9s %9s %9s %2s %4s\n",  "------", "-----", "---------", "-------", "-------", "  ", "---------", "---------", "  ", "---------", "---------",  "---------", "  ", "----") < 0)
+        if (fprintf(ofp, "   %6s %5s %9s %9s %9s %2s %9s %9s %2s %9s %9s    %9s %2s %4s\n",  "------", "-----", "---------", "-------", "-------", "  ", "---------", "---------", "  ", "---------", "---------",  "---------", "  ", "----") < 0)
           ESL_EXCEPTION_SYS(eslEWRITE, "domain hit list: write failed");
       } else {
 
@@ -1528,7 +1530,7 @@ p7_tophits_TabularTargets(FILE *ofp, char *qname, char *qacc, P7_TOPHITS *th, P7
       if (pli->long_targets) 
       {
         if (fprintf(ofp, "#%-*s %-*s %-*s %-*s %s %s %*s %*s %*s %*s %*s %6s %9s %6s %5s  %s\n",
-          tnamew-1, " target name",        taccw, "accession",  qnamew, "query name",           qaccw, "accession", "hmmfrom", "hmm to", posw, "alifrom", posw, "ali to", posw, "envfrom", posw, "env to", posw, "sq len", "strand", "  E-value", " score", " bias", "description of target") < 0)
+          tnamew-1, " target name",        taccw, "accession",  qnamew, "query name",           qaccw, "accession", "hmmfrom", "hmm to", posw, "alifrom", posw, "ali to", posw, "envfrom", posw, "env to", posw, ( pli->mode == p7_SCAN_MODELS ? "modlen" : "sq len" ), "strand", "  E-value", " score", " bias", "description of target") < 0)
           ESL_EXCEPTION_SYS(eslEWRITE, "tabular per-sequence hit list: write failed");
         if (fprintf(ofp, "#%*s %*s %*s %*s %s %s %*s %*s %*s %*s %*s %6s %9s %6s %5s %s\n",
           tnamew-1, "-------------------", taccw, "----------", qnamew, "--------------------", qaccw, "----------", "-------", "-------", posw, "-------", posw, "-------",  posw, "-------", posw, "-------", posw, "-------", "------", "---------", "------", "-----", "---------------------") < 0)
@@ -1734,7 +1736,7 @@ p7_tophits_TabularXfam(FILE *ofp, char *qname, char *qacc, P7_TOPHITS *th, P7_PI
     if (fprintf(ofp, "# hit scores\n# ----------\n#\n") < 0)
       ESL_XEXCEPTION_SYS(eslEWRITE, "xfam tabular output: write failed");
     if (fprintf(ofp, "# %-*s %-*s %-*s %6s %9s %5s  %s  %s %6s %*s %*s %*s %*s %*s   %s\n",
-    tnamew-1, "target name", taccw, "acc name", qnamew, "query name", "bits", "  e-value", " bias", "hmm-st", "hmm-en", "strand", posw, "ali-st", posw, "ali-en", posw, "env-st", posw, "env-en", posw, "sq-len", "description of target") < 0)
+    tnamew-1, "target name", taccw, "acc", qnamew, "query name", "bits", "  e-value", " bias", "hmm-st", "hmm-en", "strand", posw, "ali-st", posw, "ali-en", posw, "env-st", posw, "env-en", posw, ( pli->mode == p7_SCAN_MODELS ? "modlen" : "sq-len" ), "description of target") < 0)
       ESL_XEXCEPTION_SYS(eslEWRITE, "xfam tabular output: write failed");
     if (fprintf(ofp, "# %-*s %-*s %-*s %6s %9s %5s %s %s %6s %*s %*s %*s %*s %*s   %s\n",
     tnamew-1, "-------------------", taccw, "-------------------", qnamew, "-------------------",  "------",  "---------", "-----", "-------", "-------", "------", posw, "-------", posw, "-------",  posw, "-------", posw, "-------", posw, "-------", "---------------------") < 0)
@@ -1872,7 +1874,8 @@ p7_tophits_TabularXfam(FILE *ofp, char *qname, char *qacc, P7_TOPHITS *th, P7_PI
 /* Function:  p7_tophits_AliScores()
  * Synopsis:  Output per-position scores for each position of each query/hit pair
  *
- * Purpose:
+ * Purpose:   This depends on per-alignment-position scores having been
+ *            previously computed, as in p7_pipeline_computeAliScores()
  *
  * Returns:   <eslOK> on success.
  *
@@ -1907,87 +1910,6 @@ p7_tophits_AliScores(FILE *ofp, char *qname, P7_TOPHITS *th )
 
 }
 
-
-
-/* Function:  p7_tophits_LongInserts()
- * Synopsis:  Output list of long inserts for each query/hit pair
- *
- * Purpose:
- *
- * Returns:   <eslOK> on success.
- *
- * Throws:    <eslEMEM> on allocation failure.
- *            <eslEWRITE> if a write to <ofp> fails; for example, if
- *            the disk fills up.
- */
-int
-p7_tophits_LongInserts(FILE *ofp, char *qname, char *qacc, P7_TOPHITS *th, P7_PIPELINE *pli, int min_length)
-{
-  int         h,i,j,k;
-  int         insert_len;
-  int         status;
-  int qnamew = ESL_MAX(20, strlen(qname));
-  int tnamew = ESL_MAX(20, p7_tophits_GetMaxNameLength(th));
-  int qaccw  = ((qacc != NULL) ? ESL_MAX(10, strlen(qacc)) : 10);
-  int taccw  = ESL_MAX(10, p7_tophits_GetMaxAccessionLength(th));
-
-  P7_HIT *hit;
-
-  if (fprintf(ofp, "# Long inserts (at least length %d)\n# ------------\n#\n", min_length) < 0)
-    ESL_XEXCEPTION_SYS(eslEWRITE, "long insert output: write failed");
-
-  if (fprintf(ofp, "#%-*s %-*s %-*s %-*s %s %s\n",
-    tnamew-1, " target name",        taccw, "accession",  qnamew, "query name",           qaccw, "accession", "insert from", "insert to") < 0)
-    ESL_EXCEPTION_SYS(eslEWRITE, "long insert output: write failed");
-
-  if (fprintf(ofp, "#%*s %*s %*s %*s %s %s\n",
-    tnamew-1, "-------------------", taccw, "----------", qnamew, "--------------------", qaccw, "----------", "----------", "----------") < 0)
-    ESL_EXCEPTION_SYS(eslEWRITE, "long insert output: write failed");
-
-
-  for (h = 0; h < th->N; h++) {
-    hit = th->hit[h];
-    if (hit->flags & p7_IS_REPORTED)
-    {
-      j = hit->dcl[0].ad->sqfrom;
-      k = hit->dcl[0].ad->hmmfrom;
-      insert_len = 0;
-      for (i=0; k<=hit->dcl[0].ad->hmmto && i < hit->dcl[0].ad->N; i++) {
-//        printf("%c",hit->dcl[0].ad->model[i]);
-
-        if (hit->dcl[0].ad->model[i] == '.') {
-          insert_len++;
-        } else {
-          if (insert_len >= min_length) {
-            int start = j;
-            start -= (insert_len-1) * (hit->dcl[0].ad->sqfrom < hit->dcl[0].ad->sqto ? 1 : -1 );
-            if (fprintf(ofp, "%-*s %-*s %-*s %-*s %7d %7d\n",
-                tnamew, hit->name,
-                taccw, hit->acc,
-                qnamew, qname,
-                qaccw, qacc,
-                start,
-                j
-                 ) < 0)
-              ESL_XEXCEPTION_SYS(eslEWRITE, "xfam tabular output: write failed");
-          }
-          k++;
-          insert_len = 0;
-        }
-
-        if (hit->dcl[0].ad->aseq[i] != '-') {
-          j +=   (hit->dcl[0].ad->sqfrom < hit->dcl[0].ad->sqto ? 1 : -1 );
-        }
-      }
-
-    }
-
-  }
-  return eslOK;
-
- ERROR:
-  return status;
-}
 
 
 

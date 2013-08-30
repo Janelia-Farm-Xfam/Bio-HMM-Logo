@@ -14,6 +14,9 @@
 #include <ctype.h>
 
 #include <sys/socket.h>
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>     /* On FreeBSD, you need netinet/in.h for struct sockaddr_in            */
+#endif                      /* On OpenBSD, netinet/in.h is required for (must precede) arpa/inet.h */
 #include <arpa/inet.h>
 
 #include "easel.h"
@@ -79,8 +82,9 @@ static ESL_OPTIONS searchOpts[] = {
   { "--nonull2",    eslARG_NONE,        NULL,  NULL, NULL,    NULL,  NULL,  NULL,            "turn off biased composition score corrections",               12 },
   { "-Z",           eslARG_REAL,        FALSE, NULL, "x>0",   NULL,  NULL,  NULL,            "set # of comparisons done, for E-value calculation",          12 },
   { "--domZ",       eslARG_REAL,        FALSE, NULL, "x>0",   NULL,  NULL,  NULL,            "set # of significant seqs, for domain E-value calculation",   12 },
-  { "--seqdb",      eslARG_INT,         NULL,  NULL, "n>0",   NULL,  NULL,  "--hmmdb",       "protein database to search",                                  12 },
   { "--hmmdb",      eslARG_INT,         NULL,  NULL, "n>0",   NULL,  NULL,  "--seqdb",       "hmm database to search",                                      12 },
+  { "--seqdb",      eslARG_INT,         NULL,  NULL, "n>0",   NULL,  NULL,  "--hmmdb",       "protein database to search",                                  12 },
+  { "--seqdb_ranges",eslARG_STRING,     NULL,  NULL,  NULL,   NULL, "--seqdb", NULL,         "range(s) of sequences within --seqdb that will be searched",  12 },
   {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 
@@ -363,7 +367,7 @@ int main(int argc, char *argv[])
 
       if (esl_getopts_Reuse(go) != eslOK) p7_Die("Internal failure reusing options object");
       if (esl_opt_ProcessSpoof(go, opts) != eslOK) { 
-        printf("Failed to parse options string: %s\n", go->errbuf); 
+        printf("Failed to parse options string: %s\n", go->errbuf);
         continue;
       }
       if (esl_opt_VerifyConfig(go) != eslOK) { 
@@ -381,6 +385,7 @@ int main(int argc, char *argv[])
       *ptr = t;
       while (*ptr && isspace(*ptr)) ++ptr;
     }
+
 
     if (*ptr && strncmp(ptr, "//", 2) != 0) {
       P7_HMM          *hmm     = NULL;        /* query HMM                       */

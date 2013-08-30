@@ -419,7 +419,9 @@ p7_oprofile_UpdateFwdEmissionScores(P7_OPROFILE *om, P7_BG *bg, float *fwd_emiss
     //First compute the core characters of the alphabet
     for (x = 0; x < K; x++) {
       for (z = 0; z < 4; z++) {
-         sc_arr[z*Kp + x] =  (k+ z*nq <= M) ? log(fwd_emissions[Kp * (k+z*nq) + x]/bg->f[x]) : -eslINFINITY;
+         if (k+ z*nq <= M)  sc_arr[z*Kp + x] =  (om->mm && om->mm[(k+z*nq)]=='m') ? 0 : log(fwd_emissions[Kp * (k+z*nq) + x]/bg->f[x]);
+         else               sc_arr[z*Kp + x] =  -eslINFINITY;
+
          tmp.x[z] = sc_arr[z*Kp + x];
       }
       om->rfv[x][q] =  esl_vmx_expf(tmp.v);
@@ -1016,7 +1018,7 @@ p7_oprofile_GetFwdTransitionArray(const P7_OPROFILE *om, int type, float *arr )
  * Throws:    (no abnormal error conditions)
  */
 int
-p7_oprofile_GetMSVEmissionScoreArray(const P7_OPROFILE *om, uint8_t *arr )
+p7_oprofile_GetSSVEmissionScoreArray(const P7_OPROFILE *om, uint8_t *arr )
 {
   int x, q, z, k;
   union { vector unsigned char v; uint8_t i[16]; } tmp; /* used to align and read simd minivectors           */
@@ -1113,18 +1115,23 @@ p7_oprofile_GetFwdEmissionArray(const P7_OPROFILE *om, P7_BG *bg, float *arr )
   int x, q, z, k;
   union { vector float v; float f[4]; } tmp; /* used to align and read simd minivectors           */
   int      M   = om->M;    /* length of the query                                          */
-  int      K   = om->abc->Kp;
+  int      Kp  = om->abc->Kp;
+  int      K   = om->abc->K;
   int      nq  = p7O_NQF(M);     /* segment length; total # of striped vectors needed            */
-  int cell_cnt = (om->M + 1) * K;
+  int cell_cnt = (om->M + 1) * Kp;
 
   for (x = 0; x < K; x++) {
       for (q = 0, k = 1; q < nq; q++, k++) {
         tmp.v = om->rfv[x][q];
         for (z = 0; z < 4; z++)
-          if (  (K * (k+z*nq) + x) < cell_cnt)
-            arr[ K * (k+z*nq) + x ] = tmp.f[z] * bg->f[x];
+          if (  (Kp * (k+z*nq) + x) < cell_cnt)
+            arr[ Kp * (k+z*nq) + x ] = tmp.f[z] * bg->f[x];
       }
   }
+
+  //degeneracy emissions for each position
+  for (x = 0; x <= M; x++)
+    esl_abc_FExpectScVec(om->abc, arr+Kp*x, bg->f);
 
   return eslOK;
 }

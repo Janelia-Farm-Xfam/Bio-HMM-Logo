@@ -22,6 +22,7 @@
 
 #include "easel.h"
 #include "esl_alphabet.h"
+#include "esl_composition.h"
 #include "esl_dmatrix.h"
 #include "esl_fileparser.h"
 #include "esl_rootfinder.h"
@@ -351,6 +352,8 @@ esl_scorematrix_RelEntropy(const ESL_SCOREMATRIX *S, const double *fi, const dou
  *            and <a> is a residue in the query.
  *            
  *            $P(b \mid a) = P(ab) / P(a)$, where $P(a) = \sum_b P(ab)$.
+ *            
+ *            The value stored in <P->mx[a][b]> is $P(b \mid a)$.
  *
  *            All values in <P> involving the codes for gap,
  *            nonresidue, and missing data (codes <K>,<Kp-2>, and
@@ -725,6 +728,44 @@ static const struct esl_scorematrix_aa_preload_s ESL_SCOREMATRIX_AA_PRELOADS[] =
     }},
 };
 
+
+#define eslNTDIM 18
+
+struct esl_scorematrix_nt_preload_s {
+  char *name;
+  int   matrix[eslNTDIM][eslNTDIM];
+};
+
+static const struct esl_scorematrix_nt_preload_s ESL_SCOREMATRIX_NT_PRELOADS[] = {
+  { "DNA1", {
+    /*   A    C    G    T    -    R    Y    M    K    S    W    H    B    V    D    N    *    ~ */
+     {  41, -32, -26, -26,   0,  18, -29,  17, -26, -29,  18,   6, -28,   6,   7,   0, -38,   0, }, /*A*/
+     { -32,  39, -38, -17,   0, -35,  18,  15, -26,  14, -24,   6,   6,   3, -28,  -1, -38,   0, }, /*C*/
+     { -26, -38,  46, -31,   0,  22, -34, -32,  21,  20, -29, -32,   8,   9,  10,   1, -38,   0, }, /*G*/
+     { -26, -17, -31,  39,   0, -28,  18, -21,  15, -23,  16,   7,   7, -24,   5,   0, -38,   0, }, /*T*/
+     {   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, }, /*-*/
+     {  18, -35,  22, -28,   0,  20, -32,  -2,   3,   1,   0,  -9,  -7,   7,   8,   1, -38,   0, }, /*R*/
+     { -29,  18, -34,  18,   0, -32,  18,   0,  -1,  -1,   0,   7,   6,  -9,  -9,  -1, -38,   0, }, /*Y*/
+     {  17,  15, -32, -21,   0,  -2,   0,  16, -26,  -3,   1,   6,  -8,   4,  -7,  -1, -38,   0, }, /*M*/
+     { -26, -26,  21,  15,   0,   3,  -1, -26,  18,   3,  -1,  -8,   7,  -5,   7,   1, -38,   0, }, /*K*/
+     { -29,  14,  20, -23,   0,   1,  -1,  -3,   3,  17, -26,  -9,   7,   6,  -6,   0, -38,   0, }, /*S*/
+     {  18, -24, -29,  16,   0,   0,   0,   1,  -1, -26,  17,   7,  -8,  -7,   6,   0, -38,   0, }, /*W*/
+     {   6,   6, -32,   7,   0,  -9,   7,   6,  -8,  -9,   7,   7,  -3,  -3,  -3,   0, -38,   0, }, /*H*/
+     { -28,   6,   8,   7,   0,  -7,   6,  -8,   7,   7,  -8,  -3,   7,  -2,  -2,   0, -38,   0, }, /*B*/
+     {   6,   3,   9, -24,   0,   7,  -9,   4,  -5,   6,  -7,  -3,  -2,   6,  -1,   0, -38,   0, }, /*V*/
+     {   7, -28,  10,   5,   0,   8,  -9,  -7,   7,  -6,   6,  -3,  -2,  -1,   7,   0, -38,   0, }, /*D*/
+     {   0,  -1,   1,   0,   0,   1,  -1,  -1,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0, }, /*N*/
+     { -38, -38, -38, -38,   0, -38, -38, -38, -38, -38, -38, -38, -38, -38, -38,   0, -38,   0, }, /***/
+     {   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, }, /*~*/
+   }},
+
+};
+
+
+
+
+
+
 /* Function:  esl_scorematrix_Set()
  * Synopsis:  Set one of several standard matrices.
  *
@@ -753,10 +794,10 @@ esl_scorematrix_Set(const char *name, ESL_SCOREMATRIX *S)
   int x, y;
 
   if (S->abc_r->type == eslAMINO)
-    {
+  {
       int nmat = sizeof(ESL_SCOREMATRIX_AA_PRELOADS) / sizeof(struct esl_scorematrix_aa_preload_s);
       for (which = 0; which < nmat; which++)
-	if (strcmp(ESL_SCOREMATRIX_AA_PRELOADS[which].name, name) == 0) break;
+        if (strcmp(ESL_SCOREMATRIX_AA_PRELOADS[which].name, name) == 0) break;
       if (which >= nmat) return eslENOTFOUND;
 
       strcpy(S->outorder, "ARNDCQEGHILKMFPSTWYVBZX*"); 
@@ -764,13 +805,30 @@ esl_scorematrix_Set(const char *name, ESL_SCOREMATRIX *S)
        * residues. If that ever changes, make <outorder> a data elem in the
        * structures above.
        */
-    }
+
+      /* Transfer scores from static built-in storage */
+      for (x = 0; x < S->Kp; x++)
+        for (y = 0; y < S->Kp; y++)
+          S->s[x][y] = ESL_SCOREMATRIX_AA_PRELOADS[which].matrix[x][y];
+
+  }
+  else if (S->abc_r->type == eslDNA || S->abc_r->type == eslRNA)
+  {
+    int nmat = sizeof(ESL_SCOREMATRIX_NT_PRELOADS) / sizeof(struct esl_scorematrix_nt_preload_s);
+    for (which = 0; which < nmat; which++)
+      if (strcmp(ESL_SCOREMATRIX_NT_PRELOADS[which].name, name) == 0) break;
+    if (which >= nmat) return eslENOTFOUND;
+
+    strcpy(S->outorder, "ACGTRYMKSWHBVDN");
+
+    /* Transfer scores from static built-in storage */
+    for (x = 0; x < S->Kp; x++)
+      for (y = 0; y < S->Kp; y++)
+        S->s[x][y] = ESL_SCOREMATRIX_NT_PRELOADS[which].matrix[x][y];
+
+  }
   else return eslENOTFOUND;	/* no DNA matrices are built in yet! */
 
-  /* Transfer scores from static built-in storage */
-  for (x = 0; x < S->Kp; x++)
-    for (y = 0; y < S->Kp; y++)
-      S->s[x][y] = ESL_SCOREMATRIX_AA_PRELOADS[which].matrix[x][y];
   
   /* Use <outorder> list to set <isval[x]> */
   S->nc = strlen(S->outorder);
@@ -1134,6 +1192,8 @@ lambda_fdf(double lambda, void *params, double *ret_fx, double *ret_dfx)
  *            newly allocated $Kp \times Kp$ <ESL_DMATRIX>, over both
  *            the canonical (typically K=4 or K=20) residues in the
  *            residue alphabet, and the degenerate residue codes.
+ *            Values involving degenerate residue codes are marginal
+ *            probabilities (i.e. summed over the degeneracy).
  *            Only actual residue degeneracy can have nonzero values
  *            for <p_ij>; by convention, all values involving the
  *            special codes for gap, nonresidue, and missing data
@@ -1170,7 +1230,7 @@ lambda_fdf(double lambda, void *params, double *ret_fx, double *ret_dfx)
  */
 int
 esl_scorematrix_ProbifyGivenBG(const ESL_SCOREMATRIX *S, const double *fi, const double *fj, 
-		       double *opt_lambda, ESL_DMATRIX **opt_P)
+			       double *opt_lambda, ESL_DMATRIX **opt_P)
 {
   ESL_ROOTFINDER *R = NULL;
   ESL_DMATRIX    *P = NULL;
@@ -1237,7 +1297,8 @@ esl_scorematrix_ProbifyGivenBG(const ESL_SCOREMATRIX *S, const double *fi, const
  * Input: P->mx[i][j] are joint probabilities p_ij for the canonical
  *        alphabet 0..abc->K-1, but P matrix is allocated for Kp X Kp.
  * 
- * Fill in [i][j'=K..Kp-1], [i'=K..Kp-1][j], and
+ * Calculate marginal sums for all i,j pairs involving degeneracy
+ * codes. Fill in [i][j'=K..Kp-1], [i'=K..Kp-1][j], and
  * [i'=K..Kp-1][j'=K..Kp-1] for degeneracies i',j'. Any p_ij involving
  * a gap (K), nonresidue (Kp-2), or missing data (Kp-1) character is
  * set to 0.0 by convention.

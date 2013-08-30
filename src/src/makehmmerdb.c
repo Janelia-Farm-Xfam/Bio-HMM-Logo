@@ -1,13 +1,15 @@
-#include "divsufsort.h"
-#include "hmmer.h"
+#include "p7_config.h"
+
 #include "easel.h"
 #include "esl_sq.h"
 #include "esl_sqio.h"
 #include "esl_mem.h"
+
 #include <string.h>
 
-//#define PRINTBWT 1
-//#define PRINTOCC 1
+#include "hmmer.h"
+#include "divsufsort.h"
+
 
 #define FM_BLOCK_COUNT 100000 //max number of SQ objects in a block
 #define FM_BLOCK_OVERLAP 100000 //100 Kbases of overlap, at most, between adjascent FM-index blocks
@@ -15,9 +17,8 @@
 static ESL_OPTIONS options[] = {
   /* name           type      default  env  range     toggles   reqs   incomp              help                                                      docgroup*/
   { "-h",           eslARG_NONE,        FALSE, NULL, NULL,    NULL,  NULL,  NULL,       "show brief help on version and usage",                      1 },
-
   { "--informat",   eslARG_STRING,     FALSE, NULL, NULL, NULL, NULL,      NULL,        "specify that input file is in format <s>",                  2 },
-  { "--alph",       eslARG_STRING,     "dna", NULL, NULL,    NULL,  NULL,  NULL,        "alphabet [dna,dna_full,amino]",                             2 },
+  { "--alph",       eslARG_STRING,     NULL, NULL, NULL,    NULL,  NULL,  NULL,         "alphabet [dna,dna_full,rna,rna_full,amino]",                             2 },
   { "--bin_length", eslARG_INT,        "256", NULL, NULL,    NULL,  NULL,  NULL,        "bin length (power of 2;  32<=b<=4096)",                     2 },
   { "--sa_freq",    eslARG_INT,        "8",   NULL, NULL,    NULL,  NULL,  NULL,        "suffix array sample rate (power of 2)",                     2 },
   { "--block_size", eslARG_INT,        "50",  NULL, NULL,    NULL,  NULL,  NULL,        "input sequence broken into chunks this size (Mbases)",      2 },
@@ -25,7 +26,6 @@ static ESL_OPTIONS options[] = {
 
   {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
-
 static char usage[]  = "[options] <seqfile> <fmfile>";
 static char banner[] = "build a HMMER binary-formatted database from an input sequence file";
 
@@ -171,8 +171,12 @@ int buildAndWriteFMIndex (FM_METADATA *meta, uint32_t seq_offset, uint16_t seq_c
 
 
   uint8_t *Tcompressed;
-  if (SAsamp != NULL)
+  if (SAsamp != NULL) {
     ESL_ALLOC (Tcompressed, compressed_bytes * sizeof(uint8_t));
+
+    // Reverse the text T, so the BWT will be on reversed T.  Only used for the 1st pass
+    fm_reverseString ((char*)T, N-1);
+  }
 
   // Construct the Suffix Array on text T
   status = divsufsort(T, SA, N);
@@ -193,9 +197,7 @@ int buildAndWriteFMIndex (FM_METADATA *meta, uint32_t seq_offset, uint16_t seq_c
   }
   T[N-1]=0;
 
-
   BWT[0] =  SA[0]==0 ? 0 /* '$' */ : T[ SA[0]-1] ;
-
 
   cnts_sb[BWT[0]]++;
   cnts_b[BWT[0]]++;
@@ -209,10 +211,11 @@ int buildAndWriteFMIndex (FM_METADATA *meta, uint32_t seq_offset, uint16_t seq_c
         BWT[j] =  T[ SA[j]-1] ;
     }
 
+
     //sample the SA
     if (SAsamp != NULL) {
       if ( !(j % meta->freq_SA) )
-        SAsamp[ j>>meta->SA_shift ] = ( SA[j] == N - 1 ? -1 : SA[j] ) ; // handle the wrap-around '$'
+        SAsamp[ j/meta->freq_SA ] = ( SA[j] == N - 1 ? -1 : SA[j] ) ; // handle the wrap-around '$'
     }
 
     cnts_sb[BWT[j]]++;
@@ -222,30 +225,17 @@ int buildAndWriteFMIndex (FM_METADATA *meta, uint32_t seq_offset, uint16_t seq_c
     if ( !(  joffset % meta->freq_cnt_b) ) {  // (j+1)%freq_cnt_b==0  , i.e. every freq_cnt_bth position, noting that it's a zero-based count
 
       for (c=0; c<meta->alph_size; c++)
-        FM_OCC_CNT(b, (joffset>>meta->cnt_shift_b), c ) = cnts_b[c];
+        FM_OCC_CNT(b, (joffset/meta->freq_cnt_b), c ) = cnts_b[c];
 
       if ( !(joffset % meta->freq_cnt_sb) ) {  // j%freq_cnt_sb==0
         for (c=0; c<meta->alph_size; c++) {
-          FM_OCC_CNT(sb, (joffset>>meta->cnt_shift_sb), c ) = cnts_sb[c];
+          FM_OCC_CNT(sb, (joffset/meta->freq_cnt_sb), c ) = cnts_sb[c];
           cnts_b[c] = 0;
         }
       }
     }
   }
 
-
-
-/*
-printf("BWT (termloc: %d): \n", term_loc);
-for(j=0; j < N; ++j) {
-  printf("%d\n", BWT[j]);
-}
-
-printf("SA:\n");
-for(j=0; j < N; ++j) {
-  printf("%d\n", SA[j]);
-}
-*/
   //wrap up the counting;
   for (c=0; c<meta->alph_size; c++) {
     FM_OCC_CNT(b, num_freq_cnts_b-1, c ) = cnts_b[c];
@@ -255,47 +245,61 @@ for(j=0; j < N; ++j) {
 
 
   // Convert BWT and T to packed versions if appropriate.
-  if (meta->alph_type == fm_DNA) {
+  if (meta->alph_type == fm_DNA || meta->alph_type == fm_RNA) {
      //4 chars per byte.  Counting will be done based on quadruples 0..3; 4..7; 8..11; etc.
-      for(i=0; i < N-3; i+=4) {
-        BWT[i>>2]           = BWT[i]<<6 | BWT[i+1]<<4 | BWT[i+2]<<2 | BWT[i+3];
-        if (SAsamp != NULL)
-          Tcompressed[i>>2] =  T[i]<<6 |   T[i+1]<<4 |   T[i+2]<<2 | T[i+3];
-      }
-      if (i <= N-1) {
-        BWT[i>>2]           =  BWT[i]<<6;
-        if (SAsamp != NULL)
-          Tcompressed[i>>2] =   T[i]<<6;
-      }
-      if (i+1 <= N-1) {
-        BWT[i>>2]           =  BWT[i+1]<<4;
-        if (SAsamp != NULL)
-          Tcompressed[i>>2] =   T[i+1]<<4;
-      }
-      if (i+2 <= N-1)  {
-        BWT[i>>2]           =  BWT[i+2]<<2;
-        if (SAsamp != NULL)
-          Tcompressed[i>>2] =   T[i+2]<<2;
-      }
+      for(i=0; i < N-3; i+=4)
+        BWT[i/4]           = BWT[i]<<6 | BWT[i+1]<<4 | BWT[i+2]<<2 | BWT[i+3];
+      if (i <= N-1)
+        BWT[i/4]           =  BWT[i]<<6;
+      if (i+1 <= N-1)
+        BWT[i/4]           |=  BWT[i+1]<<4;
+      if (i+2 <= N-1)
+        BWT[i/4]           |=  BWT[i+2]<<2;
 
-  } else if (meta->alph_type == fm_DNA_full) {
+  } else if (meta->alph_type == fm_DNA_full || meta->alph_type == fm_RNA_full) {
     //2 chars per byte.  Counting will be done based on quadruples 0..3; 4..7; 8..11; etc.
-      for(i=0; i < N-1; i+=2) {
-        BWT[i>>1]           = BWT[i]<<4 | BWT[i+1];
-        if (SAsamp != NULL)
-          Tcompressed[i>>1] =   T[i]<<4 |   T[i+1];
-      }
-      if (i==N-1) {
-        BWT[i>>1]           =  BWT[i]<<4 ;
-        if (SAsamp != NULL)
-          Tcompressed[i>>1] =    T[i]<<4 ;
-      }
+      for(i=0; i < N-1; i+=2)
+        BWT[i/2]           = BWT[i]<<4 | BWT[i+1];
+      if (i==N-1)
+        BWT[i/2]           =  BWT[i]<<4 ;
   }
+
+
+
+  //If this is the 1st (reversed text) BWT, de-reverse it, then compress it
+  if (SAsamp != NULL) {
+    fm_reverseString ((char*)T, N-1);
+    // Convert BWT and T to packed versions if appropriate.
+    if (meta->alph_type == fm_DNA || meta->alph_type == fm_RNA) {
+       //4 chars per byte.  Counting will be done based on quadruples 0..3; 4..7; 8..11; etc.
+      for(i=0; i < N-3; i+=4)
+        Tcompressed[i/4] =  T[i]<<6 |   T[i+1]<<4 |   T[i+2]<<2 | T[i+3];
+
+      if (i <= N-1)
+        Tcompressed[i/4] =   T[i]<<6;
+      if (i+1 <= N-1)
+        Tcompressed[i/4] |=   T[i+1]<<4;
+      if (i+2 <= N-1)
+        Tcompressed[i/4] |=   T[i+2]<<2;
+
+    } else if (meta->alph_type == fm_DNA_full || meta->alph_type == fm_RNA_full) {
+      //2 chars per byte.  Counting will be done based on quadruples 0..3; 4..7; 8..11; etc.
+      for(i=0; i < N-1; i+=2)
+        Tcompressed[i/2] =   T[i]<<4 |   T[i+1];
+      if (i==N-1)
+        Tcompressed[i/2] =    T[i]<<4 ;
+    } else {
+      for(i=0; i < N-1; i++)
+        Tcompressed[i] =    T[i];
+    }
+  }
+
 
   for(j=0; j < N-1; ++j) {
       T[j]++;  //move values back up, in case the reverse FM needs to be built
   }
   T[N-1] = 0;
+
 
   // Write the FM-index meta data
   if(fwrite(&N, sizeof(N), 1, fp) !=  1)
@@ -308,7 +312,6 @@ for(j=0; j < N; ++j) {
     esl_fatal( "buildAndWriteFMIndex: Error writing overlap in FM index.\n");
   if(fwrite(&seq_cnt, sizeof(seq_cnt), 1, fp) !=  1)
     esl_fatal( "buildAndWriteFMIndex: Error writing seq_cnt in FM index.\n");
-
 
   // don't write Tcompressed or SAsamp if SAsamp == NULL
   if(SAsamp != NULL && fwrite(Tcompressed, sizeof(uint8_t), compressed_bytes, fp) != compressed_bytes)
@@ -343,8 +346,8 @@ ERROR:
  *            could easily be replaced.
  */
 int
-main(int argc, char *argv[]) {
-
+main(int argc, char **argv) 
+{
   char tmp_filename[16] = "fmtmpXXXXXX";
   FILE *fptmp          = NULL;
   FILE *fp             = NULL;
@@ -373,6 +376,7 @@ main(int argc, char *argv[]) {
 
   int             infmt     = eslSQFILE_UNKNOWN;
   int             alphatype = eslUNKNOWN;
+  int             alphaguess =eslUNKNOWN;
   ESL_ALPHABET   *abc       = NULL;
   ESL_SQ         *sq        = NULL;
   ESL_SQFILE     *sqfp      = NULL;
@@ -416,24 +420,6 @@ main(int argc, char *argv[]) {
 
   process_commandline(argc, argv, &go, &fname_in, &fname_out);
 
-  meta->fwd_only =  (esl_opt_IsOn(go, "--fwd_only")) ? 1 : 0;
-
-  if (esl_opt_IsOn(go, "--alph")) { meta->alph    = esl_opt_GetString(go, "--alph") ; }
-
-  if ( esl_strcmp(meta->alph, "dna")==0) {
-    meta->alph_type = fm_DNA;
-    alphatype = eslDNA;
-  } else if (esl_strcmp(meta->alph, "dna_full")==0) {
-    meta->alph_type = fm_DNA_full;
-    alphatype = eslDNA;
-  } else if (esl_strcmp(meta->alph, "amino")==0) {
-    meta->alph_type = fm_AMINO;
-    alphatype = eslAMINO;
-  } else {
-    esl_fatal("Unknown alphabet type. Try 'dna', 'dna_full', or 'amino'\n%s", "");
-  }
-  meta->alph = NULL;
-
   if (esl_opt_IsOn(go, "--bin_length")) meta->freq_cnt_b = esl_opt_GetInteger(go, "--bin_length");
   if ( meta->freq_cnt_b < 32 || meta->freq_cnt_b >4096 ||  (meta->freq_cnt_b & (meta->freq_cnt_b - 1))  ) // test power of 2
     esl_fatal("bin_length must be a power of 2, at least 128, and at most 4096\n");
@@ -452,21 +438,6 @@ main(int argc, char *argv[]) {
 
   output_header(stdout, go, fname_in, fname_out);
 
-  meta->SA_shift = log2(meta->freq_SA);
-  meta->cnt_shift_b = log2(meta->freq_cnt_b);
-  meta->cnt_shift_sb = log2(meta->freq_cnt_sb);
-
-
-  //getInverseAlphabet
-  fm_createAlphabet(meta, &(meta->charBits));
-  chars_per_byte = 8/meta->charBits;
-
-    //shift inv_alph up one, to make space for '$' at 0
-  for (i=0; i<256; i++)
-    if ( meta->inv_alph[i] >= 0)
-      meta->inv_alph[i]++;
-
-
   if (esl_opt_GetString(go, "--informat") != NULL) {
     infmt = esl_sqio_EncodeFormat(esl_opt_GetString(go, "--informat"));
     if (infmt == eslSQFILE_UNKNOWN) esl_fatal("%s is not a valid input sequence file format for --informat");
@@ -476,6 +447,65 @@ main(int argc, char *argv[]) {
   if      (status == eslENOTFOUND) esl_fatal("No such file %s", fname_in);
   else if (status == eslEFORMAT)   esl_fatal("Format of seqfile %s unrecognized.", fname_in);
   else if (status != eslOK)        esl_fatal("Open failed, code %d.", status);
+
+  meta->fwd_only = 0;
+
+  if (esl_opt_IsUsed(go, "--alph")) {
+    meta->alph    = esl_opt_GetString(go, "--alph") ;
+    if ( esl_strcmp(meta->alph, "dna")==0) {
+      meta->alph_type = fm_DNA;
+      alphatype = eslDNA;
+    } else if (esl_strcmp(meta->alph, "dna_full")==0) {
+      meta->alph_type = fm_DNA_full;
+      alphatype = eslDNA;
+    } else if (esl_strcmp(meta->alph, "rna")==0) {
+        meta->alph_type = fm_RNA;
+        alphatype = eslRNA;
+    } else if (esl_strcmp(meta->alph, "rna_full")==0) {
+        meta->alph_type = fm_RNA_full;
+        alphatype = eslRNA;
+    } else if (esl_strcmp(meta->alph, "amino")==0) {
+      meta->alph_type = fm_AMINO;
+      alphatype = eslAMINO;
+      meta->fwd_only = 1;
+    } else {
+      esl_fatal("Unknown alphabet type. Try 'dna', 'dna_full', or 'amino'\n%s", "");
+    }
+  } else {
+    esl_sqfile_GuessAlphabet(sqfp, &alphaguess);
+
+    if (alphaguess == eslDNA) {
+      meta->alph_type = fm_DNA;
+      alphatype = eslDNA;
+    } else if (alphaguess == eslRNA) {
+      meta->alph_type = fm_RNA;
+      alphatype = eslRNA;
+    } else if (alphaguess == eslAMINO) {
+      meta->alph_type = fm_AMINO;
+      alphatype = eslAMINO;
+      meta->fwd_only = 1;
+    } else {
+      esl_fatal("Unknown alphabet type. Try 'dna', 'dna_full', or 'amino'\n%s", "");
+    }
+  }
+
+
+  if (esl_opt_IsOn(go, "--fwd_only") )
+    meta->fwd_only = 1;
+
+  meta->alph = NULL;
+
+
+
+  //getInverseAlphabet
+  fm_alphabetCreate(meta, &(meta->charBits));
+  chars_per_byte = 8/meta->charBits;
+
+    //shift inv_alph up one, to make space for '$' at 0
+  for (i=0; i<256; i++)
+    if ( meta->inv_alph[i] >= 0)
+      meta->inv_alph[i]++;
+
 
   abc     = esl_alphabet_Create(alphatype);
   sq      = esl_sq_CreateDigital(abc);
@@ -525,7 +555,7 @@ main(int argc, char *argv[]) {
         block->complete = TRUE;
     }
 
-    status = esl_sqio_ReadBlock(sqfp, block, block_size, TRUE);
+    status = esl_sqio_ReadBlock(sqfp, block, block_size, -1, alphatype != eslAMINO);
     if (status == eslEOF) continue;
     if (status != eslOK)  ESL_XEXCEPTION(status, "failure reading sequence block");
 
@@ -623,15 +653,13 @@ main(int argc, char *argv[]) {
     block_length++;
 
     seq_cnt = numseqs-seq_offset;
-    //build and write FM-index for T
-
+    //build and write FM-index for T.  This will be a BWT on the reverse of the sequence, required for reverse-traversal of the BWT
     buildAndWriteFMIndex(meta, seq_offset, seq_cnt, (uint32_t)block->list[0].C, T, BWT, SA, SAsamp,
         occCnts_sb, cnts_sb, occCnts_b, cnts_b, block_length, fptmp);
 
 
     if ( ! meta->fwd_only ) {
-      //build and write FM-index for reversed T
-      fm_reverseString ((char*)T, block_length-1);
+      //build and write FM-index for un-reversed T  (used to find reverse hits using forward traversal of the BWT
       buildAndWriteFMIndex(meta, seq_offset, seq_cnt, 0, T, BWT, SA, NULL,
           occCnts_sb, cnts_sb, occCnts_b, cnts_b, block_length, fptmp);
     }
@@ -660,9 +688,6 @@ main(int argc, char *argv[]) {
       fwrite(&(meta->freq_SA),      sizeof(meta->freq_SA),      1, fp) != 1 ||
       fwrite(&(meta->freq_cnt_sb),  sizeof(meta->freq_cnt_sb),  1, fp) != 1 ||
       fwrite(&(meta->freq_cnt_b),   sizeof(meta->freq_cnt_b),   1, fp) != 1 ||
-      fwrite(&(meta->SA_shift),     sizeof(meta->SA_shift),     1, fp) != 1 ||
-      fwrite(&(meta->cnt_shift_sb), sizeof(meta->cnt_shift_sb), 1, fp) != 1 ||
-      fwrite(&(meta->cnt_shift_b),  sizeof(meta->cnt_shift_b),  1, fp) != 1 ||
       fwrite(&(meta->block_count),  sizeof(meta->block_count),  1, fp) != 1 ||
       fwrite(&(meta->seq_count),    sizeof(meta->seq_count),    1, fp) != 1 ||
       fwrite(&total_char_count,     sizeof(total_char_count),   1, fp) != 1
@@ -773,13 +798,7 @@ main(int argc, char *argv[]) {
   free(occCnts_sb);
   free(cnts_sb);
 
-  for (i=0; i<numseqs; i++)
-    free(meta->seq_data[i].name);
-  free(meta->seq_data);
-  free(meta->inv_alph);
-  free(meta->alph);
-  free(meta);
-
+  fm_metaDestroy(meta);
 
   esl_getopts_Destroy(go);
 

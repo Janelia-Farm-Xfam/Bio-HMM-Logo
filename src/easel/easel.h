@@ -341,11 +341,13 @@ typedef uint8_t ESL_DSQ;
 
 /* Some generic macros for swapping, min, and max.
  */
-#define ESL_SWAP(x, y, type)  do { type tmpxyz = (x); (x) = (y); (y) = tmpxyz; } while (0)
+#define ESL_SWAP(x, y, type)  do { type esltmpxyz = (x); (x) = (y); (y) = esltmpxyz; } while (0)
 #define ESL_MIN(a,b)          (((a)<(b))?(a):(b))
 #define ESL_MAX(a,b)          (((a)>(b))?(a):(b))
 
-static inline float esl_logf(float x) { return (x == 0.0 ? -eslINFINITY : logf(x)); }
+static inline float esl_log (double x) { return (x == 0.0 ? -eslINFINITY : log(x));  } /* avoid fp exceptions; log(0) = -inf is fine */
+static inline float esl_logf(float x)  { return (x == 0.0 ? -eslINFINITY : logf(x)); }
+static inline float esl_log2f(float x) { return (x == 0.0 ? -eslINFINITY : eslCONST_LOG2R * logf(x)); }
 
 /* Typedef: <esl_pos_t> 
  * 
@@ -441,13 +443,6 @@ extern int  esl_FCompare   (float  a, float  b, float  tol);
 extern int  esl_DCompareAbs(double a, double b, double tol);
 extern int  esl_FCompareAbs(float  a, float  b, float  tol);
 extern int  esl_CCompare(char *s1, char *s2);
-
-/* 9. Commonly used background composition (iid) frequencies. */
-extern int  esl_composition_BL62(double *f);
-extern int  esl_composition_WAG (double *f);
-extern int  esl_composition_SW34(double *f);
-extern int  esl_composition_SW50(double *f);
-
 
 #endif /*eslEASEL_INCLUDED*/
 

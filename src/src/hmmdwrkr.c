@@ -13,6 +13,9 @@
 #include <pthread.h>
 #include <setjmp.h>
 #include <sys/socket.h>
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>     /* On FreeBSD, you need netinet/in.h for struct sockaddr_in            */
+#endif                      /* On OpenBSD, netinet/in.h is required for (must precede) arpa/inet.h */
 #include <arpa/inet.h>
 #include <syslog.h>
 #include <time.h>
@@ -56,6 +59,8 @@ typedef struct {
   ESL_SQ           *seq;         /* query sequence                   */
   ESL_ALPHABET     *abc;         /* digital alphabet                 */
   ESL_GETOPTS      *opts;        /* search specific options          */
+
+  RANGE_LIST       *range_list;  /* (optional) list of ranges searched within the seqdb */
 
   double            elapsed;     /* elapsed search time              */
 
@@ -208,6 +213,13 @@ process_SearchCmd(HMMD_COMMAND *cmd, WORKER_ENV *env)
   query = process_QueryCmd(cmd, env);
   esl_stopwatch_Start(w);
 
+  info->range_list = NULL;
+  if (esl_opt_IsUsed(query->opts, "--seqdb_ranges")) {
+    ESL_ALLOC(info->range_list, sizeof(RANGE_LIST));
+    hmmpgmd_GetRanges(info->range_list, esl_opt_GetString(query->opts, "--seqdb_ranges"));
+  }
+
+
   if (query->cmd_type == HMMD_CMD_SEARCH) threadObj = esl_threads_Create(&search_thread);
   else                                    threadObj = esl_threads_Create(&scan_thread);
 
@@ -216,9 +228,14 @@ process_SearchCmd(HMMD_COMMAND *cmd, WORKER_ENV *env)
   } else {
     fprintf(stdout, "Search hmm %s  [M=%d]", query->hmm->name, query->hmm->M);
   }
-  fprintf(stdout, " vs %s DB %d [%d - %d]\n", 
+  fprintf(stdout, " vs %s DB %d [%d - %d]",
           (query->cmd_type == HMMD_CMD_SEARCH) ? "SEQ" : "HMM", 
           query->dbx, query->inx, query->inx + query->cnt - 1);
+
+  if (info->range_list)
+    fprintf(stdout, " in range(s) %s", esl_opt_GetString(query->opts, "--seqdb_ranges"));
+
+  fprintf(stdout, "\n");
 
   /* Create processing pipeline and hit list */
   for (i = 0; i < env->ncpus; ++i) {
@@ -226,6 +243,8 @@ process_SearchCmd(HMMD_COMMAND *cmd, WORKER_ENV *env)
     info[i].hmm   = query->hmm;
     info[i].seq   = query->seq;
     info[i].opts  = query->opts;
+
+    info[i].range_list  = info[0].range_list;
 
     info[i].th    = NULL;
     info[i].pli   = NULL;
@@ -301,6 +320,13 @@ process_SearchCmd(HMMD_COMMAND *cmd, WORKER_ENV *env)
   esl_threads_Destroy(threadObj);
 
   pthread_mutex_destroy(&inx_mutex);
+
+  if (info->range_list) {
+    if (info->range_list->starts)  free(info->range_list->starts);
+    if (info->range_list->ends)    free(info->range_list->ends);
+    free (info->range_list);
+  }
+
   free(info);
 
   esl_stopwatch_Destroy(w);
@@ -481,7 +507,20 @@ process_InitCmd(HMMD_COMMAND *cmd, WORKER_ENV  *env)
     }
 
     env->hmm_db = hcache;
+
+    printf("Loaded profile db %s;  models: %d  memory: %" PRId64 "\n",
+         p, hcache->n, (uint64_t) p7_hmmcache_Sizeof(hcache));
+
   }
+
+  /* if stdout is redirected at the commandline, it causes printf's to be buffered,
+   * which means status logging isn't printed. This line strongly requests unbuffering,
+   * which should be ok, given the low stdout load of hmmpgmd
+   */
+  setvbuf (stdout, NULL, _IONBF, BUFSIZ);
+  printf("Data loaded into memory. Worker is ready.\n");
+  setvbuf (stdout, NULL, _IOFBF, BUFSIZ);
+
 
   /* write back to the master that we are on line */
   n = MSG_SIZE(cmd);
@@ -592,20 +631,20 @@ search_thread(void *arg)
 
     /* Main loop: */
     for (i = 0; i < count; ++i, ++sq) {
+      if ( !(info->range_list) || hmmpgmd_IsWithinRanges ((*sq)->idx, info->range_list)) {
+        dbsq.name  = (*sq)->name;
+        dbsq.dsq   = (*sq)->dsq;
+        dbsq.n     = (*sq)->n;
+        dbsq.idx   = (*sq)->idx;
+        if((*sq)->desc != NULL) dbsq.desc  = (*sq)->desc;
 
-      dbsq.name  = (*sq)->name;
-      dbsq.dsq   = (*sq)->dsq;
-      dbsq.n     = (*sq)->n;
-      dbsq.idx   = (*sq)->idx;
-      if((*sq)->desc != NULL) dbsq.desc  = (*sq)->desc;
+        p7_bg_SetLength(bg, dbsq.n);
+        p7_oprofile_ReconfigLength(om, dbsq.n);
 
-      //p7_pli_NewSeq(pli, &dbsq);
-      p7_bg_SetLength(bg, dbsq.n);
-      p7_oprofile_ReconfigLength(om, dbsq.n);
+        p7_Pipeline(pli, om, bg, &dbsq, th);
 
-      p7_Pipeline(pli, om, bg, &dbsq, th);
-
-      p7_pipeline_Reuse(pli);
+        p7_pipeline_Reuse(pli);
+      }
     }
   }
 

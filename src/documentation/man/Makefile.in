@@ -26,13 +26,17 @@ MANS =  hmmer\
 	hmmconvert\
 	hmmemit\
 	hmmfetch\
+	hmmpgmd\
 	hmmpress\
 	hmmscan\
 	hmmsearch\
 	hmmsim\
 	hmmstat\
 	jackhmmer\
-	phmmer
+	phmmer\
+	nhmmer\
+	nhmmscan\
+	alimask
 
 .PHONY:  install uninstall clean distclean
 
