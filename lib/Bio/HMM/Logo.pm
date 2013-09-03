@@ -89,13 +89,16 @@ sub hmmToLogo {
   my $max_height_observed = 0;
   my $min_height_observed = 0;
   my $height_arr_ref;
+  my $prob_arr_ref;
   if ( $method eq "entropy_all" ) {
     $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
-    $height_arr_ref          = inline_get_relative_entropy_all($hmm);
+    my $arr_pair_ref         = inline_get_relative_entropy_all($hmm);
+    ($height_arr_ref,$prob_arr_ref) = @$arr_pair_ref;
   }
   elsif ( $method eq "entropy_above" ) {
     $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
-    $height_arr_ref          = inline_get_relative_entropy_above_bg($hmm);
+    my $arr_pair_ref         = inline_get_relative_entropy_above_bg($hmm);
+    ($height_arr_ref,$prob_arr_ref) = @$arr_pair_ref;
   }
   elsif ( $method eq "score" ) {
     $height_arr_ref = inline_get_score_heights($hmm);

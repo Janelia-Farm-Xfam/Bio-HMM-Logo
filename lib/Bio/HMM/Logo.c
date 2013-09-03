@@ -38,10 +38,10 @@ inline_get_MM_array (SV *hmm_p) {
   AV           *mm        = newAV();
 
 
-  for ( i = 1; i <= hmm->M; ++i ) 
+  for ( i = 1; i <= hmm->M; ++i )
      av_push( mm, newSVnv( (hmm->mm != NULL && hmm->mm[i] == 'm') ? 1 : 0  )   ) ;
-  
-  
+
+
   return newRV_noinc( mm );
 
 ERROR:
@@ -62,8 +62,9 @@ inline_get_relative_entropy_all (SV *hmm_p) {
   P7_HMM       *hmm       = c_obj(hmm_p, P7_HMM);
   ESL_ALPHABET *abc       = hmm->abc;
   P7_BG        *bg        = p7_bg_Create(abc);
-  SV           *arr2d_sv;
-
+  AV           *ret_av    = newAV();
+  AV           *heights_av;
+  AV           *probs_av;
 
   ESL_ALLOC(rel_ents, (hmm->M+1) * sizeof(float));
   ESL_ALLOC(heights,  (hmm->M+1) * sizeof(float*));
@@ -75,7 +76,12 @@ inline_get_relative_entropy_all (SV *hmm_p) {
 
   hmmlogo_RelativeEntropy_all(hmm, bg, rel_ents, probs, heights);
 
-  arr2d_sv = convert_c2d_to_perl2d(heights, 1, hmm->M, 0, abc->K -1);
+  heights_av = convert_c2d_to_perl2d(heights, 1, hmm->M, 0, abc->K - 1);
+  av_push( ret_av, heights_av );
+
+  probs_av   = convert_c2d_to_perl2d(probs, 1, hmm->M, 0, abc->K - 1);
+  av_push( ret_av, probs_av );
+
 
   p7_bg_Destroy(bg);
   free(rel_ents);
@@ -86,7 +92,7 @@ inline_get_relative_entropy_all (SV *hmm_p) {
   free(heights);
   free(probs);
 
-  return (arr2d_sv);
+  return newRV_noinc( ret_av );
 
 ERROR:
   if (bg != NULL) p7_bg_Destroy(bg);
@@ -114,7 +120,10 @@ inline_get_relative_entropy_above_bg (SV *hmm_p) {
   P7_HMM       *hmm       = c_obj(hmm_p, P7_HMM);
   ESL_ALPHABET *abc       = hmm->abc;
   P7_BG        *bg        = p7_bg_Create(abc);
-  SV           *arr2d_sv;
+
+  AV           *ret_av    = newAV();
+  AV           *heights_av;
+  AV           *probs_av;
 
 
   ESL_ALLOC(rel_ents, (hmm->M+1) * sizeof(float));
@@ -126,7 +135,13 @@ inline_get_relative_entropy_above_bg (SV *hmm_p) {
   }
 
   hmmlogo_RelativeEntropy_above_bg(hmm, bg, rel_ents, probs, heights);
-  arr2d_sv = convert_c2d_to_perl2d(heights, 1, hmm->M, 0, abc->K -1);
+
+  heights_av = convert_c2d_to_perl2d(heights, 1, hmm->M, 0, abc->K - 1);
+  av_push( ret_av, heights_av );
+
+  probs_av   = convert_c2d_to_perl2d(probs, 1, hmm->M, 0, abc->K - 1);
+  av_push( ret_av, probs_av );
+
 
   p7_bg_Destroy(bg);
   free(rel_ents);
@@ -137,7 +152,8 @@ inline_get_relative_entropy_above_bg (SV *hmm_p) {
   free(heights);
   free(probs);
 
-  return (arr2d_sv);
+
+  return newRV_noinc( ret_av );
 
 ERROR:
   if (bg != NULL) p7_bg_Destroy(bg);
