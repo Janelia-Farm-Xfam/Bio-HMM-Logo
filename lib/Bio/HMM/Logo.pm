@@ -88,8 +88,8 @@ sub hmmToLogo {
   my $max_height_theoretical = 0;
   my $max_height_observed = 0;
   my $min_height_observed = 0;
-  my $height_arr_ref;
-  my $prob_arr_ref;
+  my $height_arr_ref = undef;
+  my $prob_arr_ref = undef;
   if ( $method eq "entropy_all" ) {
     $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
     my $arr_pair_ref         = inline_get_relative_entropy_all($hmm);
@@ -163,6 +163,10 @@ sub hmmToLogo {
     mmline            => $mm,
     height_calc       => $method,
   };
+
+  if ($prob_arr_ref) {
+    $height_data_hashref->{probs_arr} => $prob_arr_ref;
+  }
 
   #This destroy was causing issues (no return string) when it occurred just
   #before the return.  I think that perl would actually look after us and
