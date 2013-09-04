@@ -165,7 +165,7 @@ sub hmmToLogo {
   };
 
   if ($prob_arr_ref) {
-    $height_data_hashref->{probs_arr} => $prob_arr_ref;
+    $height_data_hashref->{probs_arr} = $prob_arr_ref;
   }
 
   #This destroy was causing issues (no return string) when it occurred just
