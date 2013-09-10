@@ -131,6 +131,20 @@ sub hmmToLogo {
     }
   }
 
+  foreach my $p_row (@$prob_arr_ref) {
+    my %char_probs = ();
+    for my $i ( 0 .. $#{$p_row} ) {
+      $char_probs{ $alph_arr[$i] } = 0 + sprintf( "%.3f", ${$p_row}[$i] );
+    }
+    my @sorted_keys =
+      sort { $char_probs{$a} <=> $char_probs{$b} } keys %char_probs;
+
+    for my $i ( 0 .. $#{$p_row} ) {
+      my $key = $sorted_keys[$i];
+      ${$p_row}[$i] = "$key:$char_probs{$key}";
+    }
+  }
+
   my $insertP = inline_get_insertP($hmm);
   foreach my $v (@$insertP) {
     $v = 0 + sprintf( "%.0f", 100 * $v );
