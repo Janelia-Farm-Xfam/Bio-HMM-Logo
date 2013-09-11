@@ -870,10 +870,10 @@ typedef struct fm_hit_s {
 
 
 typedef struct fm_seqdata_s {
-  uint32_t id;
-  uint32_t start;
-  uint32_t length;
-  uint32_t offset;
+  uint32_t id;      //which sequence in the target database did this block come from (can be multiple blocks per sequence, e.g. if a sequence has Ns)
+  uint32_t start;   //the position in sequence {id} in the target database at which this sequence-block starts
+  uint32_t length;  //length of this sequence block
+  uint32_t offset;  //the position in the FM at which this sequence-block starts
   uint16_t name_length;
   uint16_t source_length;
   uint16_t acc_length;
@@ -1162,7 +1162,9 @@ typedef struct p7_pipeline_s {
   /* Domain postprocessing                                                  */
   ESL_RANDOMNESS *r;		/* random number generator                  */
   int             do_reseeding; /* TRUE: reseed for reproducible results    */
+  int             do_alignment_score_calc;
   P7_DOMAINDEF   *ddef;		/* domain definition workflow               */
+
 
   /* Reporting threshold settings                                           */
   int     by_E;		        /* TRUE to cut per-target report off by E   */
