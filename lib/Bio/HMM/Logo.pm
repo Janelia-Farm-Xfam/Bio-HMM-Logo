@@ -134,7 +134,7 @@ sub hmmToLogo {
   foreach my $p_row (@$prob_arr_ref) {
     my %char_probs = ();
     for my $i ( 0 .. $#{$p_row} ) {
-      $char_probs{ $alph_arr[$i] } = 0 + sprintf( "%.3f", ${$p_row}[$i] );
+      $char_probs{ $alph_arr[$i] } = sprintf( "%.3f", ${$p_row}[$i] );
     }
     my @sorted_keys =
       sort { $char_probs{$a} <=> $char_probs{$b} } keys %char_probs;
