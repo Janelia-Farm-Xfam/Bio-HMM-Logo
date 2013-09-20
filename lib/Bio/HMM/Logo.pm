@@ -148,7 +148,7 @@ sub hmmToLogo {
 
   my $insertP = inline_get_insertP($hmm);
   foreach my $v (@$insertP) {
-    $v = 0 + sprintf( "%.0f", 100 * $v );
+    $v = sprintf( "%.2f", $v );
   }
 
   my $insert_len = inline_get_insertLengths($hmm);
@@ -158,7 +158,7 @@ sub hmmToLogo {
 
   my $deleteP = inline_get_deleteP($hmm);
   foreach my $v (@$deleteP) {
-    $v = 0 + sprintf( "%.0f", 100 * $v );
+    $v = sprintf( "%.2f", $v );
   }
 
 
@@ -408,19 +408,19 @@ sub _build_png {
 
 
     # fill in the delete odds
-    my $delete_odds = $height_data_hashref->{delete_probs}[$i] / 100;
+    my $delete_odds = $height_data_hashref->{delete_probs}[$i];
     my $delete_fill = '#ffffff';
     my $delete_text = '#666666';
 
-    if ($delete_odds > 0.25 ) {
-      $delete_fill = '#2171b5';
-      $delete_text = '#ffffff';
+    if ( $delete_odds < 0.95 ) {
+      $delete_fill = '#bdd7e7';
     }
-    elsif ( $delete_odds > 0.15 ) {
+    elsif ( $delete_odds < 0.85 ) {
       $delete_fill = '#6baed6';
     }
-    elsif ( $delete_odds > 0.05 ) {
-      $delete_fill = '#bdd7e7';
+    elsif ($delete_odds < 0.75 ) {
+      $delete_fill = '#2171b5';
+      $delete_text = '#ffffff';
     }
 
     $image->box(
@@ -446,7 +446,7 @@ sub _build_png {
 
 
     # fill in the insert odds
-    my $insert_odds = $height_data_hashref->{insert_probs}[$i] / 100;
+    my $insert_odds = $height_data_hashref->{insert_probs}[$i];
     my $insert_fill = '#ffffff';
     my $insert_text = '#666666';
     if ($insert_odds > 0.1 ) {
@@ -810,19 +810,19 @@ sub _build_svg {
     );
 
     # fill in the delete odds
-    my $delete_odds = $height_data_hashref->{delete_probs}[$i] / 100;
+    my $delete_odds = $height_data_hashref->{delete_probs}[$i];
     my $delete_fill = '#ffffff';
     my $delete_text = '#666666';
 
-    if ($delete_odds > 0.25 ) {
-      $delete_fill = '#2171b5';
-      $delete_text = '#ffffff';
+    if ( $delete_odds < 0.95 ) {
+      $delete_fill = '#bdd7e7';
     }
-    elsif ( $delete_odds > 0.15 ) {
+    elsif ( $delete_odds < 0.85 ) {
       $delete_fill = '#6baed6';
     }
-    elsif ( $delete_odds > 0.05 ) {
-      $delete_fill = '#bdd7e7';
+    elsif ($delete_odds < 0.75 ) {
+      $delete_fill = '#2171b5';
+      $delete_text = '#ffffff';
     }
 
     $svg->rect(
@@ -847,7 +847,7 @@ sub _build_svg {
 
 
     # fill in the insert odds
-    my $insert_odds = $height_data_hashref->{insert_probs}[$i] / 100;
+    my $insert_odds = $height_data_hashref->{insert_probs}[$i];
     my $insert_fill = '#ffffff';
     my $insert_text = '#666666';
     if ($insert_odds > 0.1 ) {
@@ -876,7 +876,7 @@ sub _build_svg {
       style => {
         'font-family' => 'Arial',
         'font-size'   => '10px',
-        'fill'        => $delete_text,
+        'fill'        => $insert_text,
         'text-anchor' => 'middle',
       }
     )->cdata($insert_odds);

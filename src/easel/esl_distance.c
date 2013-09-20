@@ -723,7 +723,7 @@ esl_dst_CAverageId(char **as, int N, int max_comparisons, double *ret_id)
 {
   int    status;
   double id;
-  double sum = 0.;
+  double sum;
   int    i,j,n;
   
   if (N <= 1) { *ret_id = 1.; return eslOK; }
@@ -738,7 +738,7 @@ esl_dst_CAverageId(char **as, int N, int max_comparisons, double *ret_id)
 	    if ((status = esl_dst_CPairId(as[i], as[j], &id, NULL, NULL)) != eslOK) return status;
 	    sum += id;
 	  }
-      sum /= (double) (N * (N-1) / 2);
+      id /= (double) (N * (N-1) / 2);
     }
 
   /* If nseq is large, calculate average over a stochastic sample. */
@@ -751,11 +751,11 @@ esl_dst_CAverageId(char **as, int N, int max_comparisons, double *ret_id)
 	  if ((status = esl_dst_CPairId(as[i], as[j], &id, NULL, NULL)) != eslOK) return status;
 	  sum += id;
 	}
-      sum /= (double) max_comparisons;
+      id /= (double) max_comparisons;
       esl_randomness_Destroy(r);
     }
 
-  *ret_id = sum;
+  *ret_id = id;
   return eslOK;
 }
 #endif /* eslAUGMENT_RANDOM */
