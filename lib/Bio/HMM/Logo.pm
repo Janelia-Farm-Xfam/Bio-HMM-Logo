@@ -412,15 +412,15 @@ sub _build_png {
     my $delete_fill = '#ffffff';
     my $delete_text = '#666666';
 
-    if ( $delete_odds < 0.95 ) {
-      $delete_fill = '#bdd7e7';
+    if ($delete_odds < 0.75 ) {
+      $delete_fill = '#2171b5';
+      $delete_text = '#ffffff';
     }
     elsif ( $delete_odds < 0.85 ) {
       $delete_fill = '#6baed6';
     }
-    elsif ($delete_odds < 0.75 ) {
-      $delete_fill = '#2171b5';
-      $delete_text = '#ffffff';
+    elsif ( $delete_odds < 0.95 ) {
+      $delete_fill = '#bdd7e7';
     }
 
     $image->box(
@@ -814,15 +814,15 @@ sub _build_svg {
     my $delete_fill = '#ffffff';
     my $delete_text = '#666666';
 
-    if ( $delete_odds < 0.95 ) {
-      $delete_fill = '#bdd7e7';
+    if ($delete_odds < 0.75 ) {
+      $delete_fill = '#2171b5';
+      $delete_text = '#ffffff';
     }
     elsif ( $delete_odds < 0.85 ) {
       $delete_fill = '#6baed6';
     }
-    elsif ($delete_odds < 0.75 ) {
-      $delete_fill = '#2171b5';
-      $delete_text = '#ffffff';
+    elsif ( $delete_odds < 0.95 ) {
+      $delete_fill = '#bdd7e7';
     }
 
     $svg->rect(
