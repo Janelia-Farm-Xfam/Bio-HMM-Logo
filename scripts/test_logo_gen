@@ -1,0 +1,66 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Getopt::Long;
+use JSON;
+
+# generate fake logo data structures for use in testing.
+
+# input length, type, letters
+my ($length, $type, $sizes);
+GetOptions(
+  "length=s"  => \$length,
+  "type=s"    => \$type,
+) or ( print "Invalid option passed!\n" and help() );
+
+my @letters = ('G','C','A'..'Z','S');
+my @sizes   = (0,1,1.5,2.5,3.25,4,5,5.5,6.5);
+
+my $output = {
+  max_height_obs    => 6.5,
+  height_calc       => "emission",
+  delete_probs      => [],
+  alphabet          => 'aa',
+  min_height_obs    => 0,
+  max_height_theory => 6.5,
+  height_arr        => [],
+  insert_lengths    => [],
+  insert_probs      => [],
+  mmline            => [],
+  probs_arr         => [],
+};
+
+# output json string that can be used on the dynamic logo code.
+
+for (my $i = 0; $i < scalar @letters; $i++) {
+  print "$i $letters[$i] $letters[-$i]\n";
+  my $letter = $letters[$i];
+  my $inverse = $letters[scalar @letters - 1 - $i];
+  for (my $j = 0; $j < scalar @sizes; $j++) {
+    my $size = $sizes[$j];
+    my $inv_size = $sizes[scalar @sizes - 1 - $j];
+    push @{$output->{probs_arr}}, 0;
+    push @{$output->{insert_lengths}}, 0;
+    push @{$output->{insert_probs}}, 0;
+    push @{$output->{mmline}}, 0;
+    push @{$output->{delete_probs}}, 0;
+    push @{$output->{height_arr}}, ["$letter:$size","$inverse:$inv_size"];
+  }
+}
+
+for my $letter (@letters) {
+  for my $size (@sizes) {
+    push @{$output->{probs_arr}}, 0;
+    push @{$output->{insert_lengths}}, 0;
+    push @{$output->{insert_probs}}, 0;
+    push @{$output->{mmline}}, 0;
+    push @{$output->{delete_probs}}, 0;
+    push @{$output->{height_arr}}, ["$letter:$size"];
+  }
+}
+
+
+print encode_json($output);
+
+1;
