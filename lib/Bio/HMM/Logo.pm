@@ -5,6 +5,7 @@ use warnings;
 use JSON;
 use File::Spec;
 use Imager ':handy';
+use SVG;
 
 
 =head1 NAME
@@ -220,22 +221,37 @@ sub hmmToLogoPNG {
   return _build_png($height_data_hashref, $scaled);
 }
 
-=head2 _build_png
+=head2 hmmToLogoSVG
 
 =cut
 
-sub _build_png {
-  my ($height_data_hashref, $scaled, $debug) = @_;
+sub hmmToLogoSVG {
+  my ($hmmfile, $method, $scaled) = @_;
+  my $height_data_hashref = hmmToLogo($hmmfile, $method);
+  return _build_svg($height_data_hashref, $scaled);
+}
 
-  my $dna_colors = {
+
+=head2 _dna_colors
+
+=cut
+
+sub _dna_colors {
+  return {
     'A'=> '#cbf751',
     'C'=> '#5ec0cc',
     'G'=> '#ffdf59',
     'T'=> '#b51f16',
     'U'=> '#b51f16'
   };
+}
 
-  my $aa_colors = {
+=head2 _aa_colors
+
+=cut
+
+sub _aa_colors {
+  return {
     'A'=> '#FF9966',
     'C'=> '#009999',
     'D'=> '#FF0000',
@@ -257,12 +273,42 @@ sub _build_png {
     'W'=> '#66CC66',
     'Y'=> '#006600'
   };
+}
 
-  my $colors = $dna_colors;
-  if (exists $height_data_hashref->{alphabet}
-    && $height_data_hashref->{alphabet} eq 'aa') {
-    $colors = $aa_colors;
+
+=head2 _colors_by_alphabet
+
+=cut
+
+sub _colors_by_alphabet {
+  my $alphabet = shift;
+  if ($alphabet && $alphabet eq 'aa') {
+    return _aa_colors;
   }
+  else {
+    return _dna_colors;
+  }
+}
+
+=head2 _image_height
+
+=cut
+
+sub _image_height {
+  return 300;
+}
+
+=head2 _build_png
+
+=cut
+
+sub _build_png {
+  my ($height_data_hashref, $scaled, $debug) = @_;
+  my $alphabet = (exists $height_data_hashref->{alphabet}) ?
+                   $height_data_hashref->{alphabet} : 'dna';
+
+
+  my $colors = _colors_by_alphabet($alphabet);
 
   my $path = __FILE__;
   $path =~ s|[^/]*$||;
@@ -273,11 +319,10 @@ sub _build_png {
   my $font = Imager::Font->new(file => $regfont, color => '#eeeeee') or die "$!\n";
   my $bold_font = Imager::Font->new(file => $boldfont, color => '#eeeeee') or die "$!\n";
 
-
   #create PNG
 
   # determine image width and height
-  my $height       = 300;
+  my $height       = _image_height;
   my $column_width = 32;
   my $left_gutter  = 40;
   my $column_count = scalar @{$height_data_hashref->{height_arr}};
@@ -668,6 +713,411 @@ sub _build_png {
 }
 
 
+=head2 _build_svg
+
+=cut
+
+sub _build_svg {
+  my ($height_data_hashref, $scaled, $debug) = @_;
+  my $alphabet = (exists $height_data_hashref->{alphabet}) ?
+                   $height_data_hashref->{alphabet} : 'dna';
+
+  my $colors = _colors_by_alphabet($alphabet);
+
+  # determine image width and height
+  my $height       = _image_height;
+  my $column_width = 32;
+  my $left_gutter  = 40;
+  my $column_count = scalar @{$height_data_hashref->{height_arr}};
+  my $width        = $column_count * $column_width;
+
+
+
+  my $max_height = $height_data_hashref->{max_height_obs};
+  if (defined $scaled) {
+    if (exists $height_data_hashref->{height_calc}
+      && $height_data_hashref->{height_calc} eq 'emission') {
+      $max_height = $height_data_hashref->{max_height_theory};
+    }
+  }
+
+  $width += $left_gutter;
+  # create svg version and render it here.
+  my $svg = SVG->new(width => $width, height => $height);
+
+  # clear the background and set as white.
+  $svg->rect(
+    x      => 0,
+    y      => 0,
+    width  => $width,
+    height => $height,
+    style  => {
+      fill => '#fff',
+    }
+  );
+
+  for (my $i = 0; $i < $column_count; $i++) {
+    # draw the divider lines
+    $svg->line(
+      x1 => $left_gutter + ($i * $column_width),
+      x2 => $left_gutter + ($i * $column_width),
+      y1 => 0,
+      y2 => $height,
+      style => {
+        stroke => '#ddd',
+      }
+    );
+
+    # draw the ticks
+    $svg->line(
+      x1 => $left_gutter + ($i * $column_width),
+      x2 => $left_gutter + ($i * $column_width),
+      y1 => 0,
+      y2 => 5,
+      style => {
+        stroke => '#999',
+      }
+    );
+    # draw delete probability section ticks
+    $svg->line(
+      x1 => $left_gutter + ($i * $column_width),
+      x2 => $left_gutter + ($i * $column_width),
+      y1 => $height - 45,
+      y2 => $height - 40,
+      style => {
+        stroke => '#999',
+      }
+    );
+    # draw insert probability section ticks
+    $svg->line(
+      x1 => $left_gutter + ($i * $column_width),
+      x2 => $left_gutter + ($i * $column_width),
+      y1 => $height - 30,
+      y2 => $height - 25,
+      style => {
+        stroke => '#999',
+      }
+    );
+    # draw insert length section ticks
+    $svg->line(
+      x1 => $left_gutter + ($i * $column_width),
+      x2 => $left_gutter + ($i * $column_width),
+      y1 => $height - 15,
+      y2 => $height - 10,
+      style => {
+        stroke => '#999',
+      }
+    );
+
+    # fill in the delete odds
+    my $delete_odds = $height_data_hashref->{delete_probs}[$i] / 100;
+    my $delete_fill = '#ffffff';
+    my $delete_text = '#666666';
+
+    if ($delete_odds > 0.25 ) {
+      $delete_fill = '#2171b5';
+      $delete_text = '#ffffff';
+    }
+    elsif ( $delete_odds > 0.15 ) {
+      $delete_fill = '#6baed6';
+    }
+    elsif ( $delete_odds > 0.05 ) {
+      $delete_fill = '#bdd7e7';
+    }
+
+    $svg->rect(
+      x => $left_gutter + ($i * $column_width) + 1,
+      y => $height - 45,
+      width => $column_width,
+      height => 15,
+      style  => {
+        fill => $delete_fill,
+      }
+    );
+    $svg->text(
+      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+      y => $height - 34,
+      style => {
+        'font-family' => 'Arial',
+        'font-size'   => '10px',
+        'fill'        => $delete_text,
+        'text-anchor' => 'middle',
+      }
+    )->cdata($delete_odds);
+
+
+    # fill in the insert odds
+    my $insert_odds = $height_data_hashref->{insert_probs}[$i] / 100;
+    my $insert_fill = '#ffffff';
+    my $insert_text = '#666666';
+    if ($insert_odds > 0.1 ) {
+      $insert_fill = '#d7301f';
+      $insert_text = '#ffffff';
+    }
+    elsif ( $insert_odds > 0.05 ) {
+      $insert_fill = '#fc8d59';
+    }
+    elsif ( $insert_odds > 0.03 ) {
+      $insert_fill = '#fdcc8a';
+    }
+
+    $svg->rect(
+      x => $left_gutter + ($i * $column_width) + 1,
+      y => $height - 30,
+      width => $column_width,
+      height => 15,
+      style  => {
+        fill => $insert_fill,
+      }
+    );
+    $svg->text(
+      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+      y => $height - 19,
+      style => {
+        'font-family' => 'Arial',
+        'font-size'   => '10px',
+        'fill'        => $delete_text,
+        'text-anchor' => 'middle',
+      }
+    )->cdata($insert_odds);
+
+    # fill in the insert length
+    my $insert_len = $height_data_hashref->{insert_lengths}[$i];
+    my $length_fill = '#ffffff';
+    my $length_text = '#666666';
+
+    if ($insert_len > 9 ) {
+      $length_fill = '#d7301f';
+      $length_text = '#ffffff';
+    }
+    elsif ( $insert_len > 7 ) {
+      $length_fill = '#fc8d59';
+    }
+    elsif ( $insert_len > 4 ) {
+      $length_fill = '#fdcc8a';
+    }
+
+    $svg->rect(
+      x => $left_gutter + ($i * $column_width) + 1,
+      y => $height - 15,
+      width => $column_width,
+      height => 15,
+      style  => {
+        fill => $length_fill,
+      }
+    );
+    $svg->text(
+      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+      y => $height - 4,
+      style => {
+        'font-family' => 'Arial',
+        'font-size'   => '10px',
+        'fill'        => $length_text,
+        'text-anchor' => 'middle',
+      }
+    )->cdata($height_data_hashref->{insert_lengths}[$i]);
+
+    # draw the letters
+    if ($height_data_hashref->{mmline}[$i] == 1) {# the column is masked
+      $svg->rect(
+        x => $left_gutter + ($i * $column_width) + 1,
+        y => 1,
+        width => $column_width,
+        height => $height - 45,
+        filled => 1,
+        style  => {
+          fill => '#ccc',
+        }
+      );
+    }
+    else {
+      # TODO: Letter drawing goes here
+      my $column = $height_data_hashref->{height_arr}[$i];
+      my $previous_height = 0;
+      my @coordinates = ();
+      for my $letter (@$column) {
+        my @values = split ':', $letter, 2;
+        if ($values[1] > 0.01) { # the letter is significant enough to draw
+          my $letter_color = $colors->{$values[0]};
+          my $letter_height = (1 * $values[1]) / $max_height;
+          my $glyph_height = $letter_height * ($height - 45);
+
+          my $x = $left_gutter + ($i * $column_width) + ($column_width / 2);
+          my $y = ($height - 45) - $previous_height;
+
+          my $rect_y = $y;
+
+          my $h_ratio = $glyph_height / 60;
+          my $w_ratio = $column_width / 70;
+
+          my $font_size = '85px';
+
+          if($values[0] =~ /G|C/) {
+            $font_size = '80px';
+
+            $y -= ($glyph_height * 2) / 100;
+          }
+
+          push @coordinates, {
+            x       => $x,
+            y       => $y,
+            f_size  => $font_size,
+            w_ratio => $w_ratio,
+            h_ratio => $h_ratio,
+            color   => $letter_color,
+            char    => $values[0],
+          };
+
+          if ($debug) {
+            $svg->rect(
+              x => $left_gutter + ($i * $column_width),
+              y => $rect_y - $glyph_height,
+              width => $column_width,
+              height => $glyph_height,
+              style => {
+                stroke => $letter_color,
+                'fill-opacity' => 0,
+              }
+            );
+          }
+
+          $previous_height += $glyph_height;
+
+        }
+      }
+
+      # Draw the letters in reverse order so that the larger letters
+      # don't overlap the smaller ones below. This makes it easier to
+      # read the smaller letters.
+
+      for my $letter (reverse @coordinates) {
+        $svg->text(
+          x => 0,
+          y => 0,
+          style => {
+            'font-family' => 'Arial',
+            'font-size'   => $letter->{f_size},
+            'font-weight' => 'bold',
+            'fill'        => $letter->{color},
+            'text-anchor' => 'middle',
+          },
+          transform => "matrix($letter->{w_ratio}, 0, 0, $letter->{h_ratio}, $letter->{x}, $letter->{y})",
+
+        )->cdata($letter->{char});
+      }
+
+    }
+
+    #draw the column number
+    $svg->text(
+      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+      y => 10,
+      style => {
+        'font-family' => 'Arial',
+        'font-size'   => '10px',
+        'fill'        => '#999',
+        'text-anchor' => 'middle',
+      }
+    )->cdata($i + 1);
+
+  }
+
+  # draw the axes
+  # y-axes
+  $svg->line(
+    x1 => $left_gutter - 5,
+    x2 => $width,
+    y1 => 0,
+    y2 => 0,
+    style => {
+      stroke => '#999',
+    }
+  );
+  $svg->text(
+    x => $left_gutter - 5,
+    y => 8,
+    style => {
+      'font-family' => 'Arial',
+      'font-size'   => '10px',
+      'fill'        => '#666',
+      'text-anchor' => 'end',
+    }
+  )->cdata(sprintf('%.2f', $max_height));
+  # draw the line above the insert length section
+  $svg->line(
+    x1 => $left_gutter,
+    x2 => $width,
+    y1 => $height - 15,
+    y2 => $height - 15,
+    style => {
+      stroke => '#999',
+    }
+  );
+  # draw the line above the insert probability section
+  $svg->line(
+    x1 => $left_gutter,
+    x2 => $width,
+    y1 => $height - 30,
+    y2 => $height - 30,
+    style => {
+      stroke => '#999',
+    }
+  );
+  # draw the line above the delete probability section
+  $svg->line(
+    x1 => $left_gutter - 5, # extend a little for the 0 tick mark
+    x2 => $width,
+    y1 => $height - 45,
+    y2 => $height - 45,
+    style => {
+      stroke => '#999',
+    }
+  );
+  $svg->text(
+    x => $left_gutter - 5,
+    y => $height - 45,
+    style => {
+      'font-family' => 'Arial',
+      'font-size'   => '10px',
+      'fill'        => '#666',
+      'text-anchor' => 'end',
+    }
+  )->cdata('0');
+  $svg->line(
+    x1 => $left_gutter - 5, # extend a little for the midpoint tick mark
+    x2 => $left_gutter,
+    y1 => ($height - 45) / 2,
+    y2 => ($height - 45) / 2,
+    style => {
+      stroke => '#999',
+    }
+  );
+  $svg->text(
+    x => $left_gutter - 5,
+    y => (($height - 45) / 2) + 3,
+    style => {
+      'font-family' => 'Arial',
+      'font-size'   => '10px',
+      'fill'        => '#666',
+      'text-anchor' => 'end',
+    }
+  )->cdata(sprintf('%.2f', $max_height / 2));
+
+  # x-axis
+  $svg->line(
+    x1 => $left_gutter,
+    x2 => $left_gutter,
+    y1 => 0,
+    y2 => $height,
+    style => {
+      stroke => '#999',
+    }
+  );
+
+  return $svg->xmlify;
+}
+
+
 ######
 # OO interface
 #
@@ -714,8 +1164,8 @@ sub raw {
 sub as_json {
   my ($self, $method) = @_;
   my $height_data_hashref = hmmToLogo($self->hmm_file, $method);
-  my $json             = JSON->new->allow_nonref;
-  my $height_data_json = $json->encode($height_data_hashref);
+  my $json                = JSON->new->allow_nonref;
+  my $height_data_json    = $json->encode($height_data_hashref);
   return $height_data_json;
 }
 
@@ -726,6 +1176,15 @@ sub as_json {
 sub as_png {
   my ($self, $method, $scaled) = @_;
   return hmmToLogoPNG($self->hmm_file, $method, $scaled);
+}
+
+=head2 as_svg
+
+=cut
+
+sub as_svg {
+  my ($self, $method, $scaled) = @_;
+  return hmmToLogoSVG($self->hmm_file, $method, $scaled);
 }
 
 =head2 dl_load_flags

@@ -30,10 +30,17 @@ $png = Bio::HMM::Logo::hmmToLogoPNG( $hmmfile );
 my $png_json = read_file( $FindBin::Bin . '/data/score_calc.json' );
 my $png_input = decode_json $png_json;
 my $aa_png = Bio::HMM::Logo::_build_png( $png_input, 1, 'debug');
-open my $png_file, '>', '/tmp/logo_text.png';
+open my $png_file, '>', '/tmp/logo_test.png';
 binmode $png_file;
 print $png_file $aa_png;
 close $png_file;
+
+my $svg = Bio::HMM::Logo::hmmToLogoSVG( $hmmfile );
+
+open my $svg_file, '>', '/tmp/logo_test.svg';
+print $svg_file $svg;
+close $svg_file;
+
 
 # test corrupt files
 $logo_json = undef;

@@ -27,6 +27,14 @@ is($hmmfile, $filename, "expect to see the same filename that we entered on obje
 my $logo_json = undef;
 lives_ok { $logo_json = $logo->as_json()} q/Expect the as_png method to work if file is available/;
 
+# uncomment this if you want to replace the json test file.
+# Should do a diff of the two to make sure you aren't changing
+# something unexpected.
+
+#open my $new_json, '>',  $FindBin::Bin . '/data/test_new.json' or die;
+#print $new_json $logo_json;
+#close $new_json;
+
 # compare the json string to the load file
 my $logo_obj = decode_json $logo_json;
 my $expected_obj = decode_json $expected;
