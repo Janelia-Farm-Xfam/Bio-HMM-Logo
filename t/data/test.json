@@ -1838,7 +1838,7 @@
             "T:1.292"
         ]
     ], 
-    "height_calc": "entropy_all", 
+    "height_calc": "info_content_all", 
     "insert_lengths": [
         4, 
         4, 
