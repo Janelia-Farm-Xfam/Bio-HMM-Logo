@@ -73,8 +73,8 @@ Perhaps a little code snippet.
 sub hmmToLogo {
   my ( $hmmfile, $method ) = @_;
 
-  if ( !$method || $method !~ /^(entropy_all|entropy_above|score)$/ ) {
-    $method = 'entropy_all';
+  if ( !$method || $method !~ /^(info_content_all|info_content_above|score)$/ ) {
+    $method = 'info_content_all';
   }
 
   unless ( -e $hmmfile ) {
@@ -91,12 +91,12 @@ sub hmmToLogo {
   my $min_height_observed = 0;
   my $height_arr_ref = undef;
   my $prob_arr_ref = undef;
-  if ( $method eq "entropy_all" ) {
+  if ( $method eq "info_content_all" ) {
     $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
     my $arr_pair_ref         = inline_get_relative_entropy_all($hmm);
     ($height_arr_ref,$prob_arr_ref) = @$arr_pair_ref;
   }
-  elsif ( $method eq "entropy_above" ) {
+  elsif ( $method eq "info_content_above" ) {
     $max_height_theoretical  = inline_hmmlogo_maxHeight($abc);
     my $arr_pair_ref         = inline_get_relative_entropy_above_bg($hmm);
     ($height_arr_ref,$prob_arr_ref) = @$arr_pair_ref;
