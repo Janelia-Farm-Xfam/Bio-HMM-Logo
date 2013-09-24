@@ -5,7 +5,6 @@ use Test::Deep;
 use Test::Warn;
 use Test::Exception;
 use File::Slurp;
-use Data::Printer;
 use JSON;
 use FindBin;
 

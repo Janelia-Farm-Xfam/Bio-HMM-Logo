@@ -37,6 +37,8 @@ WriteMakefile(
         'Test::Deep' => 0,
         'Test::Warn' => 0,
         'Imager'     => 0,
+        'SVG'        => 0,
+        'JSON'       => 0,
     },
     CONFIGURE_REQUIRES  =>  {
       'Inline::MakeMaker'     => 0.45,
