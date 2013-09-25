@@ -111,7 +111,8 @@ sub hmmToLogo {
     my $height_sum = 0;
     my $neg_height_sum = 0;
     for my $i ( 0 .. $#{$row} ) {
-      $char_heights{ $alph_arr[$i] } = 0 + sprintf( "%.3f", ${$row}[$i] );
+
+      $char_heights{ $alph_arr[$i] } = ${$row}[$i];
       if ($char_heights{ $alph_arr[$i] } > 0) {
         $height_sum += $char_heights{ $alph_arr[$i] } ;
       }
@@ -119,30 +120,30 @@ sub hmmToLogo {
         $neg_height_sum += $char_heights{ $alph_arr[$i] } ;
       }
     }
-    $max_height_observed = $height_sum  if ($height_sum > $max_height_observed);
-    $min_height_observed = $neg_height_sum  if ($neg_height_sum < $min_height_observed);
+    $max_height_observed = sprintf("%.3f", $height_sum) if ($height_sum > $max_height_observed);
+    $min_height_observed = sprintf("%.3f", $neg_height_sum)  if ($neg_height_sum < $min_height_observed);
 
     #sort by height
     my @sorted_keys =
-      sort { $char_heights{$a} <=> $char_heights{$b} } keys %char_heights;
+      sort { $char_heights{$a} <=> $char_heights{$b} || $a cmp $b } keys %char_heights;
 
     for my $i ( 0 .. $#{$row} ) {
       my $key = $sorted_keys[$i];
-      ${$row}[$i] = "$key:$char_heights{$key}";
+      ${$row}[$i] = "$key:" . sprintf("%.3f", $char_heights{$key});
     }
   }
 
   foreach my $p_row (@$prob_arr_ref) {
     my %char_probs = ();
     for my $i ( 0 .. $#{$p_row} ) {
-      $char_probs{ $alph_arr[$i] } = sprintf( "%.3f", ${$p_row}[$i] );
+      $char_probs{ $alph_arr[$i] } = ${$p_row}[$i];
     }
     my @sorted_keys =
-      sort { $char_probs{$a} <=> $char_probs{$b} } keys %char_probs;
+      sort { $char_probs{$a} <=> $char_probs{$b} || $a cmp $b } keys %char_probs;
 
     for my $i ( 0 .. $#{$p_row} ) {
       my $key = $sorted_keys[$i];
-      ${$p_row}[$i] = "$key:$char_probs{$key}";
+      ${$p_row}[$i] = "$key:" . sprintf("%.3f", $char_probs{$key});
     }
   }
 
