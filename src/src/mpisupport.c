@@ -1751,8 +1751,8 @@ int main(void) { return 0; }
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: mpisupport.c 4452 2013-05-05 01:44:04Z wheelert $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/mpisupport.c $
  *****************************************************************/
 
 

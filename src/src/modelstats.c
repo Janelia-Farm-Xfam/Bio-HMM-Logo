@@ -1,7 +1,7 @@
 /* Miscellaneous summary statistics calculated for HMMs and profiles.
  * 
  * SRE, Fri May  4 11:43:20 2007 [Janelia]
- * SVN $Id$
+ * SVN $Id: modelstats.c 4385 2013-02-05 14:42:40Z wheelert $
  */
 
 #include "p7_config.h"

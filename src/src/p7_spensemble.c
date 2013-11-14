@@ -2,7 +2,7 @@
  * posterior sampling and clustering.
  * 
  * SRE, Wed Jan  9 07:26:34 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: p7_spensemble.c 3474 2011-01-17 13:25:32Z eddys $
  */
 #include "p7_config.h"
 #include "easel.h"

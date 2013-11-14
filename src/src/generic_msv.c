@@ -9,7 +9,7 @@
  *   6. Copyright and license information.
  * 
  * SRE, Fri Aug 15 10:38:21 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: generic_msv.c 4540 2013-10-15 15:45:51Z wheelert $
  */
 
 #include "p7_config.h"

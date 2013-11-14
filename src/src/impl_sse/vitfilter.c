@@ -421,7 +421,7 @@ p7_ViterbiFilter_longtarget(const ESL_DSQ *dsq, int L, const P7_OPROFILE *om, P7
           for (z = 0; z < 8; z++)  { // unstripe
             if ( tmp.i[z] == xE && (q+Q*z+1) <= om->M) {
               // (q+Q*z+1) is the model position k at which the xE score is found
-              p7_hmmwindow_new(windowlist, 0, i, 0, (q+Q*z+1), 1, 0.0, p7_NOCOMPLEMENT, L );
+              p7_hmmwindow_new(windowlist, 0, i, i-1, (q+Q*z+1), 1, 0.0, p7_NOCOMPLEMENT, L );
             }
           }
           MMXo(q) = IMXo(q) = DMXo(q) = _mm_set1_epi16(-32768); //reset score to start search for next vit window.
@@ -917,7 +917,7 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: vitfilter.c 4540 2013-10-15 15:45:51Z wheelert $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/impl_sse/vitfilter.c $
  *****************************************************************/
 

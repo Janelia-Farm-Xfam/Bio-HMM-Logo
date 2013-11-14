@@ -2,7 +2,7 @@
  * routines: structures, declarations, and macros.
  * 
  * MSF, Oct 27, 2009 [Janelia]
- * SVN $Id$
+ * SVN $Id: impl_dummy.h 4511 2013-07-08 19:05:40Z wheelert $
  */
 #ifndef P7_IMPL_DUMMY_INCLUDED
 #define P7_IMPL_DUMMY_INCLUDED

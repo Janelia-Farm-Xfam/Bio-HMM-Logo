@@ -304,6 +304,6 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $URL$
- * SVN $Id$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/seqmodel.c $
+ * SVN $Id: seqmodel.c 3878 2012-02-26 15:04:16Z eddys $
  *****************************************************************/

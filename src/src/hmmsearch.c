@@ -1381,7 +1381,7 @@ pipeline_thread(void *arg)
   ESL_SQ_BLOCK  *block = NULL;
   void          *newBlock;
   
-  impl_ThreadInit();
+  impl_Init();
 
   obj = (ESL_THREADS *) arg;
   esl_threads_Started(obj, &workeridx);
@@ -1428,7 +1428,7 @@ pipeline_thread(void *arg)
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $URL$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmsearch.c $
  * SVN $Id: hmmsearch.c 3572 2011-06-20 18:06:12Z wheelert $
  *****************************************************************/
 

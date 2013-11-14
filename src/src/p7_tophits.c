@@ -2162,8 +2162,8 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: p7_tophits.c 4520 2013-08-09 02:12:54Z wheelert $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/p7_tophits.c $
  *****************************************************************/
 
 

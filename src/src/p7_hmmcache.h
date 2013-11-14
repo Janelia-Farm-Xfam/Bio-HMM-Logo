@@ -25,6 +25,6 @@ extern void   p7_hmmcache_Close          (P7_HMMCACHE *cache);
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: p7_hmmcache.h 3754 2011-11-21 14:25:31Z eddys $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/p7_hmmcache.h $
  *****************************************************************/

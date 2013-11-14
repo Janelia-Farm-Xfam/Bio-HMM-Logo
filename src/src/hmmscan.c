@@ -1258,7 +1258,7 @@ pipeline_thread(void *arg)
   P7_OM_BLOCK   *block;
   void          *newBlock;
   
-  impl_ThreadInit();
+  impl_Init();
 
   obj = (ESL_THREADS *) arg;
   esl_threads_Started(obj, &workeridx);
@@ -1307,7 +1307,7 @@ pipeline_thread(void *arg)
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: hmmscan.c 4545 2013-10-22 21:46:16Z wheelert $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmscan.c $
  *****************************************************************/
 

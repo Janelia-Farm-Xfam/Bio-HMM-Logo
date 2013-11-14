@@ -9,7 +9,7 @@
  *   6. Copyright and license information.
  *   
  * SRE, Mon Aug 18 08:15:50 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: decoding.c 3665 2011-08-25 13:45:55Z eddys $
  */
 
 #include "p7_config.h"

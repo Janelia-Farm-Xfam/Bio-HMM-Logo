@@ -4,7 +4,7 @@
  *  ./hmmstat Pfam
  *  
  * SRE, Thu May 24 11:18:20 2007
- * SVN $Id$
+ * SVN $Id: hmmstat.c 4321 2012-11-27 16:15:47Z wheelert $
  */
 #include "p7_config.h"
 

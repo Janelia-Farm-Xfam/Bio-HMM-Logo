@@ -66,9 +66,9 @@ p7_hmmwindow_new (P7_HMM_WINDOWLIST *list, uint32_t id, uint32_t pos, uint32_t f
   window->fm_n             = fm_pos;
   window->k                = k;
   window->length           = length;
-  window->target_len       = target_len;
   window->score            = score;
   window->complementarity  = complementarity;
+  window->target_len       = target_len;
 
   list->count++;
 

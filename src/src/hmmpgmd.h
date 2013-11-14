@@ -1,6 +1,6 @@
 /*
- * SVN $URL$
- * SVN $Id$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmpgmd.h $
+ * SVN $Id: hmmpgmd.h 4423 2013-04-12 18:56:33Z wheelert $
  */
 #ifndef P7_HMMPGMD_INCLUDED
 #define P7_HMMPGMD_INCLUDED

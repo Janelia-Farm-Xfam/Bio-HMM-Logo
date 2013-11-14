@@ -829,6 +829,6 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $URL$
- * SVN $Id$  
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/generic_fwdback.c $
+ * SVN $Id: generic_fwdback.c 3776 2011-12-02 18:38:22Z eddys $  
  *****************************************************************/

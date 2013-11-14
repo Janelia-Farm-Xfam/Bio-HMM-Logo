@@ -677,7 +677,7 @@ main(int argc, char **argv)
 /************************************************************
  * @LICENSE@
  * 
- * SVN $URL$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/build.c $
  * SVN $Id: build.c 3496 2011-02-28 22:18:49Z eddys $
  ************************************************************/
 

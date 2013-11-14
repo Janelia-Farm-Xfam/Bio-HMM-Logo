@@ -10,7 +10,7 @@
  *   7. Copyright and license information.
  * 
  * MSF Tue Nov 3, 2009 [Janelia]
- * SVN $Id$
+ * SVN $Id: optacc.c 3665 2011-08-25 13:45:55Z eddys $
  */
 #include "p7_config.h"
 

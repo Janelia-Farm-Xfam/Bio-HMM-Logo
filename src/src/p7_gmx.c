@@ -493,6 +493,6 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $URL$
- * SVN $Id$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/p7_gmx.c $
+ * SVN $Id: p7_gmx.c 3734 2011-11-02 12:45:37Z eddys $
  *****************************************************************/

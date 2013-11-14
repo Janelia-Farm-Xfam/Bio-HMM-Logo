@@ -9,7 +9,7 @@
  *   6. Copyright and license information.
  *
  * SRE, Mon Aug 18 08:31:11 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: null2.c 3474 2011-01-17 13:25:32Z eddys $
  */
 #include "p7_config.h"
 

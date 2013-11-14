@@ -293,6 +293,6 @@ map_alignment(const char *msafile, const P7_HMM *hmm, ESL_SQ ***ret_sq, P7_TRACE
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $URL$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmalign.c $
  * SVN $Id: hmmalign.c 3619 2011-07-28 11:14:18Z eddys $
  *****************************************************************/

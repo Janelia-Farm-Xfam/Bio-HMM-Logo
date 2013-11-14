@@ -165,6 +165,6 @@ open_db_files(ESL_GETOPTS *go, char *basename, FILE **ret_mfp,  FILE **ret_ffp, 
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $URL$
- * SVN $Id$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmpress.c $
+ * SVN $Id: hmmpress.c 3630 2011-08-03 14:09:27Z eddys $
  *****************************************************************/

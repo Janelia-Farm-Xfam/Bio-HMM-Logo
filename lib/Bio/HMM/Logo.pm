@@ -154,7 +154,7 @@ sub hmmToLogo {
 
   my $insert_len = inline_get_insertLengths($hmm);
   foreach my $v (@$insert_len) {
-    $v = 0 + sprintf( "%.0f", $v );
+    $v = 0 + sprintf( "%.1f", $v );
   }
 
   my $deleteP = inline_get_deleteP($hmm);

@@ -483,6 +483,6 @@ dump_matrix_csv(FILE *fp, P7_GMX *pp, int istart, int iend, int kstart, int kend
 /*****************************************************************
  * @LICENSE@
  *   
- * SVN $URL$
- * SVN $Id$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/generic_decoding.c $
+ * SVN $Id: generic_decoding.c 3816 2012-01-22 15:23:50Z eddys $
  *****************************************************************/

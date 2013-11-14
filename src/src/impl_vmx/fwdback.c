@@ -29,7 +29,7 @@
  *   8. Copyright and license information.
  * 
  * SRE, Thu Jul 31 08:43:20 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: fwdback.c 3665 2011-08-25 13:45:55Z eddys $
  */
 #include "p7_config.h"
 

@@ -390,7 +390,7 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $URL$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/logsum.c $
  * SVN $Id: logsum.c 3474 2011-01-17 13:25:32Z eddys $
  *****************************************************************/
 

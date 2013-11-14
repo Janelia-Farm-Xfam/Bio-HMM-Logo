@@ -20,7 +20,7 @@
  *   6. Copyright and license information.
  *   
  * SRE, Sun Aug  3 13:10:24 2008 [St. Louis]
- * SVN $Id$
+ * SVN $Id: vitscore.c 3665 2011-08-25 13:45:55Z eddys $
  */
 #include "p7_config.h"
 

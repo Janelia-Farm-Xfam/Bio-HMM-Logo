@@ -10,7 +10,7 @@
  *   7. Copyright and license information.
  * 
  * SRE, Mon Aug 18 20:01:01 2008 [Casa de Gatos]
- * SVN $Id$
+ * SVN $Id: optacc.c 3991 2012-04-17 21:08:00Z eddys $
  */
 #include "p7_config.h"
 

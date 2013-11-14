@@ -27,7 +27,7 @@
  * etc) are then verified against the generic implementations. 
  * 
  * SRE, Tue Jul 17 08:17:36 2007 [Janelia]
- * SVN $Id$
+ * SVN $Id: itest_brute.c 3960 2012-03-22 21:42:50Z wheelert $
  * xref J1/106-109: original implementation
  * xref J5/118:     revival; brought up to date with H3's assumptions of zero insert scores.
  */

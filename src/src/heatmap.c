@@ -2,7 +2,7 @@
  * evolving toward eventual inclusion in Easel
  * 
  * SRE, Thu Jan 25 09:51:18 2007 [Janelia] [Elgar, Enigma Variations]
- * SVN $Id$
+ * SVN $Id: heatmap.c 3474 2011-01-17 13:25:32Z eddys $
  */
 #include "p7_config.h"
 

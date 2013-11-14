@@ -228,7 +228,7 @@ emit_sequences(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNESS *r, P7_HMM
   int         do_profile   = esl_opt_GetBoolean(go, "-p");
   int         N            = esl_opt_GetInteger(go, "-N");
   int         L            = esl_opt_GetInteger(go, "-L");
-  int         mode;
+  int         mode         = p7_LOCAL;
   int         nseq;
   int         status;
 
@@ -275,6 +275,6 @@ emit_sequences(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNESS *r, P7_HMM
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $URL$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmemit.c $
  * SVN $Id: hmmemit.c 3474 2011-01-17 13:25:32Z eddys $
  *****************************************************************/

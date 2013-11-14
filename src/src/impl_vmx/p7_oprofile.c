@@ -13,7 +13,7 @@
  *   9. Copyright and license information.
  *
  * SRE, Wed Jul 30 11:00:04 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: p7_oprofile.c 4511 2013-07-08 19:05:40Z wheelert $
  */
 #include "p7_config.h"
 

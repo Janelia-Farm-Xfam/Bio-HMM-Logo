@@ -956,6 +956,6 @@ elide_length_model(P7_PROFILE *gm, P7_BG *bg)
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $URL$
- * SVN $Id$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmsim.c $
+ * SVN $Id: hmmsim.c 3658 2011-08-20 17:41:31Z eddys $
  *****************************************************************/

@@ -12,7 +12,7 @@
  *   6. Copyright and license information.
  *   
  * MSF, Tue Nov 03, 2009 [Janelia]
- * SVN $Id$
+ * SVN $Id: vitscore.c 3665 2011-08-25 13:45:55Z eddys $
  */
 #include "p7_config.h"
 

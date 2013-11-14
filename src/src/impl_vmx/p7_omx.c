@@ -9,7 +9,7 @@
  *   p7_omx.ai - figure illustrating the layout of a P7_OMX.
  *
  * SRE, Sun Nov 25 11:26:48 2007 [Casa de Gatos]
- * SVN $Id$
+ * SVN $Id: p7_omx.c 3474 2011-01-17 13:25:32Z eddys $
  */
 #include "p7_config.h"
 

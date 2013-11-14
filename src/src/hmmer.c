@@ -7,7 +7,7 @@
  *   4. License and copyright 
  *
  * SRE, Fri Jan 12 13:19:38 2007 [Janelia] [Franz Ferdinand, eponymous]
- * SVN $Id$
+ * SVN $Id: hmmer.c 3474 2011-01-17 13:25:32Z eddys $
  */
 
 #include "p7_config.h"

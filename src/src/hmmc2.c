@@ -596,8 +596,8 @@ int main(int argc, char *argv[])
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: hmmc2.c 4483 2013-06-12 20:20:21Z wheelert $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmc2.c $
  *****************************************************************/
 
 

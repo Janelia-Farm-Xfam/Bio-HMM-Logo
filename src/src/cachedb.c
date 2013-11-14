@@ -660,6 +660,6 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $URL$
- * SVN $Id$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/cachedb.c $
+ * SVN $Id: cachedb.c 4437 2013-04-26 17:57:41Z wheelert $
  *****************************************************************/

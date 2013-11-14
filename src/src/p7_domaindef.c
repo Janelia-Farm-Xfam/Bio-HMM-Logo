@@ -31,7 +31,7 @@
  * all the necessary working memory and heuristic thresholds.
  *   
  * SRE, Thu Jan 24 09:28:01 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: p7_domaindef.c 4548 2013-10-24 19:05:36Z wheelert $
  */
 #include "p7_config.h"
 
@@ -919,6 +919,9 @@ rescore_isolated_domain(P7_DOMAINDEF *ddef, P7_OPROFILE *om, const ESL_SQ *sq,
     }
 
     p7_oprofile_ReconfigRestLength(om, orig_L);
+
+    if (domcorrection < envsc)  //negative bias correction shouldn't happen. Stick with the original score.
+      envsc = domcorrection;
 
     dom->domcorrection = domcorrection - envsc;
 

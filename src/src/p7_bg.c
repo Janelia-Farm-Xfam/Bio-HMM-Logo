@@ -754,8 +754,8 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: p7_bg.c 3751 2011-11-17 22:46:50Z wheelert $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/p7_bg.c $
  *****************************************************************/
 
 

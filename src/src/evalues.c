@@ -8,7 +8,7 @@
  *   5. Copyright and license information
  * 
  * SRE, Mon Aug  6 13:00:06 2007
- * SVN $Id$
+ * SVN $Id: evalues.c 3474 2011-01-17 13:25:32Z eddys $
  */
 #include "p7_config.h"
 

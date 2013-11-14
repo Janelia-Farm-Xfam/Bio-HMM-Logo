@@ -9,7 +9,7 @@
  *   6. Copyright and license information.
  *
  * SRE, Fri Aug 15 10:50:55 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: generic_stotrace.c 3665 2011-08-25 13:45:55Z eddys $
  */
 
 #include "p7_config.h"

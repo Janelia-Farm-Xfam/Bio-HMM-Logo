@@ -7,7 +7,7 @@
  *    4. Copyright and license.
  * 
  * SRE, Tue Jan  9 08:55:53 2007 [Janelia] [The Crystal Method, Vegas]
- * SVN $Id$
+ * SVN $Id: emit.c 4216 2012-09-26 18:52:10Z wheelert $
  */
 
 #include "p7_config.h"

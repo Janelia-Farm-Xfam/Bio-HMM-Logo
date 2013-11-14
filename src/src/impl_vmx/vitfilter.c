@@ -18,7 +18,7 @@
  *   6. Copyright and license information
  * 
  * SRE, Thu Jul 31 20:32:25 2008 [Casa de Gatos]
- * SVN $Id$
+ * SVN $Id: vitfilter.c 4321 2012-11-27 16:15:47Z wheelert $
  */
 #include "p7_config.h"
 

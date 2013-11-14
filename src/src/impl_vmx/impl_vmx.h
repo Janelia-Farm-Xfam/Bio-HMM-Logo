@@ -2,7 +2,7 @@
  * routines: structures, declarations, and macros.
  * 
  * SRE, Sun Nov 25 11:23:02 2007
- * SVN $Id$
+ * SVN $Id: impl_vmx.h 4511 2013-07-08 19:05:40Z wheelert $
  */
 #ifndef P7_IMPL_VMX_INCLUDED
 #define P7_IMPL_VMX_INCLUDED

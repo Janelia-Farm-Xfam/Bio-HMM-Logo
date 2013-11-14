@@ -10,7 +10,7 @@
  *   7. Copyright and license information
  * 
  * SRE, Fri Feb 29 12:48:46 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: generic_optacc.c 3788 2011-12-16 01:53:22Z eddys $
  */
 
 #include "p7_config.h"

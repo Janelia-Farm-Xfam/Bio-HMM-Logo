@@ -7,7 +7,7 @@
  *   4. Copyright and license.
  * 
  * SRE, Tue Oct 21 19:38:19 2008 [Casa de Gatos]
- * SVN $Id$
+ * SVN $Id: tracealign.c 4513 2013-07-13 13:50:56Z eddys $
  */
 #include "p7_config.h"
 

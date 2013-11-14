@@ -1985,6 +1985,6 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  *   
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: p7_oprofile.c 4511 2013-07-08 19:05:40Z wheelert $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/impl_sse/p7_oprofile.c $
  *****************************************************************/

@@ -281,7 +281,7 @@ p7_GViterbi_longtarget(const ESL_DSQ *dsq, int L, const P7_PROFILE *gm, P7_GMX *
 
         for (k = 1; k <= gm->M; k++) {
           if (MMX(i,k) == XMX(i,p7G_E)) {
-            p7_hmmwindow_new(windowlist, 0, i, 0, k, 1, 0.0, p7_NOCOMPLEMENT, L );
+            p7_hmmwindow_new(windowlist, 0, i, 0, k, 1, 0.0, p7_NOCOMPLEMENT, L);
           }
           MMX(i,0) = IMX(i,0) = DMX(i,0) = -eslINFINITY;
         }
@@ -714,6 +714,6 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $URL$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/generic_viterbi.c $
  * SVN $Id: generic_viterbi.c 3569 2011-06-16 16:16:13Z eddys $
  *****************************************************************/

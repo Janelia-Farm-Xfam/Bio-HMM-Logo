@@ -5,7 +5,7 @@
  *    Ph.D. thesis, Washington University School of Medicine, 2006.
  *    
  * SRE, Fri May  4 14:01:54 2007 [Janelia] [Tom Waits, Orphans]
- * SVN $Id$   
+ * SVN $Id: eweight.c 3474 2011-01-17 13:25:32Z eddys $   
  */
 
 #include "p7_config.h"

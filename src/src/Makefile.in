@@ -365,6 +365,6 @@ clean:
 ################################################################
 # @LICENSE@
 #
-# SVN $URL$
-# SVN $Id$
+# SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/Makefile.in $
+# SVN $Id: Makefile.in 4511 2013-07-08 19:05:40Z wheelert $
 ################################################################

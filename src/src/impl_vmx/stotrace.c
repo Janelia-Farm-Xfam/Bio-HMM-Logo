@@ -11,7 +11,7 @@
  *    7. Copyright and license information.
  *    
  * SRE, Fri Aug 15 08:02:43 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: stotrace.c 3497 2011-03-02 23:18:03Z eddys $
  */   
 #include "p7_config.h"
 

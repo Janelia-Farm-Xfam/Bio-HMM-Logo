@@ -871,6 +871,6 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  *    
- * SVN $URL$
- * SVN $Id$
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/impl_dummy/io.c $
+ * SVN $Id: io.c 3960 2012-03-22 21:42:50Z wheelert $
  *****************************************************************/

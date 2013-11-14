@@ -2572,7 +2572,7 @@ main(int argc, char **argv)
 /*****************************************************************
  * @LICENSE@
  *
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: p7_hmmfile.c 4436 2013-04-26 14:38:41Z wheelert $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/p7_hmmfile.c $
  *****************************************************************/
 

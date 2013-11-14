@@ -15,7 +15,7 @@
  *   6. Copyright and license information
  * 
  * MSF Tue Nov 3, 2009 [Janelia]
- * SVN $Id$
+ * SVN $Id: vitfilter.c 4103 2012-06-24 02:09:43Z wheelert $
  */
 #include "p7_config.h"
 

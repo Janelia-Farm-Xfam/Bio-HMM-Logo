@@ -9,7 +9,7 @@
  *   6. Copyright and license information.
  *
  * MSF Tue Nov 3, 2009 [Janelia]
- * SVN $Id$
+ * SVN $Id: null2.c 3474 2011-01-17 13:25:32Z eddys $
  */
 #include "p7_config.h"
 

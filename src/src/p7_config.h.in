@@ -13,7 +13,7 @@
  * header file.
  * 
  * SRE, Mon Jan  1 16:07:28 2007 [Casa de Gatos] [Nirvana, Nevermind]
- * SVN $Id$
+ * SVN $Id: p7_config.h.in 4483 2013-06-12 20:20:21Z wheelert $
  */
 #ifndef P7_CONFIGH_INCLUDED
 #define P7_CONFIGH_INCLUDED

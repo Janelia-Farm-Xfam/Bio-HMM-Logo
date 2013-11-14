@@ -1,8 +1,8 @@
 /* master side of the hmmpgmd daemon
  * 
  * MSF, Thu Aug 12, 2010 [Janelia]
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: hmmdmstr.c 4483 2013-06-12 20:20:21Z wheelert $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmdmstr.c $
  */
 #include "p7_config.h"
 

@@ -2,7 +2,7 @@
  * 
  * 
  * SRE, Sat Mar 24 09:12:44 2007 [Janelia]
- * SVN $Id$
+ * SVN $Id: p7_prior.c 4102 2012-06-24 02:06:57Z wheelert $
  */
 
 #include "p7_config.h"

@@ -366,9 +366,7 @@ main(int argc,  char *argv[])
         for (i = 0; i< hit_num; i++) {
 
           status = fm_getOriginalPosition (fmsf, meta, hits[i].block, hits[i].length, hits[i].direction, hits[i].start,  &(hits[i].block), &(hits[i].start) );
-          hits[i].sortkey = (status==eslERANGE ? -1 : meta->seq_data[ hits[i].block ].id);
-
-          //printf("block %d , start %d\n", hits[i].block, hits[i].start);
+          hits[i].sortkey = (status==eslERANGE ? -1 : meta->seq_data[ hits[i].block ].target_id);
 
           if (hits[i].sortkey != -1)
             hit_num2++; // legitimate hit
@@ -393,7 +391,7 @@ main(int argc,  char *argv[])
           if (out != NULL) {
             fprintf (out, "%s\n",line);
             //fprintf (out, "\t%10s (%8d %s)\n",meta->seq_data[ hits[i].block ].name, hits[i].start, (hits[i].direction==fm_forward?"+":"-"));
-            fprintf (out, "    %8d %s %10s\n", hits[i].start, (hits[i].direction==fm_forward?"f":"b"), meta->seq_data[ hits[i].block ].name);
+            fprintf (out, "    %8ld %s %10s\n", (long)(hits[i].start), (hits[i].direction==fm_forward?"f":"b"), meta->seq_data[ hits[i].block ].name);
           }
           hit_indiv_cnt++;
           i++; // skip the first one, since I'll be comparing each to the previous
@@ -406,7 +404,7 @@ main(int argc,  char *argv[])
             {
               if (out != NULL)
                 //fprintf (out, "\t%10s (%8d %s)\n",meta->seq_data[ hits[i].block ].name, hits[i].start, (hits[i].direction==fm_forward?"+":"-"));
-                fprintf (out, "    %8d %s %10s\n", hits[i].start, (hits[i].direction==fm_forward?"f":"b"), meta->seq_data[ hits[i].block ].name);
+                fprintf (out, "    %8ld %s %10s\n", (long)(hits[i].start), (hits[i].direction==fm_forward?"f":"b"), meta->seq_data[ hits[i].block ].name);
               hit_indiv_cnt++;
             }
           }

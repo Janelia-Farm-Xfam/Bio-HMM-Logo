@@ -13,7 +13,7 @@
  * to a separate file because it's so important.
  * 
  * SRE, Thu Feb 28 09:51:27 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: generic_null2.c 3474 2011-01-17 13:25:32Z eddys $
  */
 #include "p7_config.h"
 

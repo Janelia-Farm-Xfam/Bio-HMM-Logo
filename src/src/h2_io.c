@@ -244,6 +244,6 @@ printprob(FILE *fp, int fieldwidth, float p, float null)
 /*****************************************************************
  * @LICENSE@
  * 
- * SVN $Id$
- * SVN $URL$
+ * SVN $Id: h2_io.c 3722 2011-10-24 17:23:02Z eddys $
+ * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/h2_io.c $
  *****************************************************************/

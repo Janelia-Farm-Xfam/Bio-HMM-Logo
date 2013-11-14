@@ -15,7 +15,7 @@
  *   6. Copyright and license information
  * 
  * SRE, Sun Nov 25 11:26:48 2007 [Casa de Gatos]
- * SVN $Id$
+ * SVN $Id: msvfilter.c 4511 2013-07-08 19:05:40Z wheelert $
  */
 #include "p7_config.h"
 

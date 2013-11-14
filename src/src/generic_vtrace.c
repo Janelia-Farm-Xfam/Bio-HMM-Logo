@@ -6,7 +6,7 @@
  *   3. Copyright and license information.
  *   
  * SRE, Fri Aug 15 09:17:11 2008 [Janelia]
- * SVN $Id$
+ * SVN $Id: generic_vtrace.c 3474 2011-01-17 13:25:32Z eddys $
  */
 
 #include "p7_config.h"
