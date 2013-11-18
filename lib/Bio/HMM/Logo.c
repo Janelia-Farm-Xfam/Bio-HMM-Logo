@@ -51,6 +51,24 @@ ERROR:
 
 }
 
+SV*
+inline_get_alignment_map (SV *hmm_p) {
+  int           status;
+  int           i;
+  P7_HMM       *hmm       = c_obj(hmm_p, P7_HMM);
+  AV           *map        = newAV();
+
+  for ( i = 1; i <= hmm->M; ++i )
+     av_push( map, newSVnv( hmm->map[i] );
+
+  return newRV_noinc( map );
+
+ERROR:
+
+  croak("error getting mm line ");
+  return NULL;
+
+}
 
 SV*
 inline_get_relative_entropy_all (SV *hmm_p) {

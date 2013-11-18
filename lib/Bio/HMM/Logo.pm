@@ -162,9 +162,11 @@ sub hmmToLogo {
     $v = sprintf( "%.2f", $v );
   }
 
-
   my $abc_type = inline_get_abc_type($hmm);
+
   my $mm = inline_get_MM_array($hmm);
+  my $ali_map = inline_get_alignment_map($hmm);
+
 
 
   my $height_data_hashref = {
@@ -177,6 +179,7 @@ sub hmmToLogo {
     insert_lengths    => $insert_len,
     delete_probs      => $deleteP,
     mmline            => $mm,
+    ali_map           => $ali_map,
     height_calc       => $method,
   };
 
