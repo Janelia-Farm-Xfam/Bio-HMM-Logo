@@ -1195,6 +1195,7 @@ sub as_svg {
 =head2 inline_destroy_abc
 =head2 inline_destroy_hmm
 =head2 inline_get_MM_array
+=head2 inline_get_alignment_map
 =head2 inline_get_abc
 =head2 inline_get_abc_type
 =head2 inline_get_alphabet_string

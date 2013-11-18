@@ -20,7 +20,7 @@ $logo_json = Bio::HMM::Logo::hmmToLogoJson( $hmmfile );
 my $logo_obj = decode_json $logo_json;
 my $expected_obj = decode_json $expected;
 
-cmp_deeply($logo_obj, $expected_obj, 'The logo json structure was created correctly');
+cmp_deeply($logo_obj, $expected_obj, 'Checking The logo json structure was created correctly. If this failed, check that you have the current version of Bio::HMM::Logo installed.');
 
 my $png = undef;
 $png = Bio::HMM::Logo::hmmToLogoPNG( $hmmfile );

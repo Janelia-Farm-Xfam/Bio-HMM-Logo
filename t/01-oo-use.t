@@ -39,7 +39,7 @@ lives_ok { $logo_json = $logo->as_json()} q/Expect the as_png method to work if 
 my $logo_obj = decode_json $logo_json;
 my $expected_obj = decode_json $expected;
 
-cmp_deeply($logo_obj, $expected_obj, 'The logo json structure was created correctly');
+cmp_deeply($logo_obj, $expected_obj, 'Checking The logo json structure was created correctly. If this failed, check that you have the current version of Bio::HMM::Logo installed.');
 
 my $png = undef;
 lives_ok{$png = $logo->as_png()} q/Expect the as_png method to work if file is available/;
