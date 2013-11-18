@@ -1307,6 +1307,9 @@ typedef struct p7_builder_s {
  * 18. Routines in HMMER's exposed API.
  *****************************************************************/
 
+/* alimask.c */
+extern int p7_Alimask_MakeModel2AliMap(ESL_MSA *msa, int do_hand, float symfrac, int *map );
+
 /* build.c */
 extern int p7_Handmodelmaker(ESL_MSA *msa,                P7_BUILDER *bld, P7_HMM **ret_hmm, P7_TRACE ***ret_tr);
 extern int p7_Fastmodelmaker(ESL_MSA *msa, float symfrac, P7_BUILDER *bld, P7_HMM **ret_hmm, P7_TRACE ***ret_tr);
@@ -1787,6 +1790,6 @@ extern int fm_getOccCountLT   (const FM_DATA *fm, const FM_CFG *cfg, int pos, ui
 /************************************************************
  * @LICENSE@
  *
- * SVN $Id: hmmer.h 4562 2013-11-14 14:04:06Z wheelert $
+ * SVN $Id: hmmer.h 4548 2013-10-24 19:05:36Z wheelert $
  * SVN $URL: https://svn.janelia.org/eddylab/eddys/src/hmmer/branches/3.1/src/hmmer.h $
  ************************************************************/
