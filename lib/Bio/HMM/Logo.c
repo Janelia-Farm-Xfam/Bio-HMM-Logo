@@ -59,7 +59,7 @@ inline_get_alignment_map (SV *hmm_p) {
   AV           *map        = newAV();
 
   for ( i = 1; i <= hmm->M; ++i )
-     av_push( map, newSVnv( hmm->map[i] );
+     av_push( map, newSVnv( hmm->map[i] ));
 
   return newRV_noinc( map );
 
