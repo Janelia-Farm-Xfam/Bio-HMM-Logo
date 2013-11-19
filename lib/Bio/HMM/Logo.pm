@@ -71,11 +71,13 @@ Perhaps a little code snippet.
 =cut
 
 sub hmmToLogo {
-  my ( $hmmfile, $method ) = @_;
+  my ( $hmmfile, $method, $processing ) = @_;
 
   if ( !$method || $method !~ /^(info_content_all|info_content_above|score)$/ ) {
     $method = 'info_content_all';
   }
+
+  $processing ||= 'hmm';
 
   unless ( -e $hmmfile ) {
     die "$hmmfile does not exist on disk!\n";
@@ -181,6 +183,7 @@ sub hmmToLogo {
     mmline            => $mm,
     ali_map           => $ali_map,
     height_calc       => $method,
+    processing        => $processing,
   };
 
   if ($prob_arr_ref) {
@@ -204,9 +207,9 @@ sub hmmToLogo {
 =cut
 
 sub hmmToLogoJson {
-  my ($hmmfile, $method) = @_;
+  my ($hmmfile, $method, $processing) = @_;
 
-  my $height_data_hashref = hmmToLogo($hmmfile, $method);
+  my $height_data_hashref = hmmToLogo($hmmfile, $method, $processing);
 
   my $json             = JSON->new->allow_nonref;
   my $height_data_json = $json->encode($height_data_hashref);
@@ -1166,8 +1169,8 @@ sub raw {
 =cut
 
 sub as_json {
-  my ($self, $method) = @_;
-  my $height_data_hashref = hmmToLogo($self->hmm_file, $method);
+  my ($self, $method, $processing) = @_;
+  my $height_data_hashref = hmmToLogo($self->hmm_file, $method, $processing);
   my $json                = JSON->new->allow_nonref;
   my $height_data_json    = $json->encode($height_data_hashref);
   return $height_data_json;
