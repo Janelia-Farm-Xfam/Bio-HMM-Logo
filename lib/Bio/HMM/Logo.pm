@@ -367,16 +367,6 @@ sub _build_png {
 
 
   for (my $i = 0; $i < $column_count; $i++) {
-    # draw the divider lines
-    $image->line(
-      color => '#EEEEEE',
-      x1 => $left_gutter + ($i * $column_width),
-      x2 => $left_gutter + ($i * $column_width),
-      y1 => 0,
-      y2 => $height,
-      aa => 1,
-      endp => 1
-    );
     # draw the ticks
     $image->line(
       color => '#999999',
@@ -796,16 +786,6 @@ sub _build_svg {
   );
 
   for (my $i = 0; $i < $column_count; $i++) {
-    # draw the divider lines
-    $svg->line(
-      x1 => $left_gutter + ($i * $column_width),
-      x2 => $left_gutter + ($i * $column_width),
-      y1 => 0,
-      y2 => $height,
-      style => {
-        stroke => '#ddd',
-      }
-    );
 
     # draw the ticks
     $svg->line(
