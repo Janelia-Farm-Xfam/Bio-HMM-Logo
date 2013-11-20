@@ -223,8 +223,8 @@ sub hmmToLogoJson {
 =cut
 
 sub hmmToLogoPNG {
-  my ($hmmfile, $method, $scaled) = @_;
-  my $height_data_hashref = hmmToLogo($hmmfile, $method);
+  my ($hmmfile, $method, $scaled, $processing) = @_;
+  my $height_data_hashref = hmmToLogo($hmmfile, $method, $processing);
   return _build_png($height_data_hashref, $scaled);
 }
 
@@ -233,8 +233,8 @@ sub hmmToLogoPNG {
 =cut
 
 sub hmmToLogoSVG {
-  my ($hmmfile, $method, $scaled) = @_;
-  my $height_data_hashref = hmmToLogo($hmmfile, $method);
+  my ($hmmfile, $method, $scaled, $processing) = @_;
+  my $height_data_hashref = hmmToLogo($hmmfile, $method, $processing);
   return _build_svg($height_data_hashref, $scaled);
 }
 
@@ -326,6 +326,13 @@ sub _build_png {
   my $font = Imager::Font->new(file => $regfont, color => '#eeeeee') or die "$!\n";
   my $bold_font = Imager::Font->new(file => $boldfont, color => '#eeeeee') or die "$!\n";
 
+  my $show_inserts = (exists $height_data_hashref->{processing} && $height_data_hashref->{processing} =~ /observed|weighted/) ? 0 : 1;
+
+  my $offset = 15;
+  if ($show_inserts) {
+    $offset = 45;
+  }
+
   #create PNG
 
   # determine image width and height
@@ -380,26 +387,28 @@ sub _build_png {
       aa => 1,
       endp => 1
     );
-    # draw delete probability section ticks
-    $image->line(
-      color => '#999999',
-      x1 => $left_gutter + ($i * $column_width),
-      x2 => $left_gutter + ($i * $column_width),
-      y1 => $height - 45,
-      y2 => $height - 40,
-      aa => 1,
-      endp => 1
-    );
-    # draw insert probability section ticks
-    $image->line(
-      color => '#999999',
-      x1 => $left_gutter + ($i * $column_width),
-      x2 => $left_gutter + ($i * $column_width),
-      y1 => $height - 30,
-      y2 => $height - 25,
-      aa => 1,
-      endp => 1
-    );
+    if ($show_inserts) {
+      # draw delete probability section ticks
+      $image->line(
+        color => '#999999',
+        x1 => $left_gutter + ($i * $column_width),
+        x2 => $left_gutter + ($i * $column_width),
+        y1 => $height - 45,
+        y2 => $height - 40,
+        aa => 1,
+        endp => 1
+      );
+      # draw insert probability section ticks
+      $image->line(
+        color => '#999999',
+        x1 => $left_gutter + ($i * $column_width),
+        x2 => $left_gutter + ($i * $column_width),
+        y1 => $height - 30,
+        y2 => $height - 25,
+        aa => 1,
+        endp => 1
+      );
+    }
     # draw insert length section ticks
     $image->line(
       color => '#999999',
@@ -418,6 +427,10 @@ sub _build_png {
     my $delete_odds = $height_data_hashref->{delete_probs}[$i];
     my $delete_fill = '#ffffff';
     my $delete_text = '#666666';
+    my $delete_y    = $height - 15;
+    my $delete_text_y = $height - 12;
+    my $delete_box_max = $height;
+    my $delete_box_min = $height - 15;
 
     if ($delete_odds < 0.75 ) {
       $delete_fill = '#2171b5';
@@ -430,17 +443,25 @@ sub _build_png {
       $delete_fill = '#bdd7e7';
     }
 
+    if ($show_inserts) {
+      $delete_y    = $height - 45;
+      $delete_text_y = $height - 42;
+      $delete_box_max = $height - 30;
+      $delete_box_min = $height - 45;
+    }
+
+
     $image->box(
       color => $delete_fill,
       xmin => $left_gutter + ($i * $column_width) + 1,
-      ymin => $height - 45,
+      ymin => $delete_box_min,
       xmax => ($left_gutter + ($i * $column_width) + $column_width) - 1,
-      ymax => $height - 30,
+      ymax => $delete_box_max,
       filled => 1
     );
     $image->align_string(
       x => $left_gutter + ($i * $column_width) + ($column_width / 2),
-      y => $height - 42,
+      y => $delete_text_y,
       font => $font,
       string => $delete_odds,
       color => $delete_text,
@@ -451,80 +472,80 @@ sub _build_png {
     );
 
 
+    if ($show_inserts) {
+      # fill in the insert odds
+      my $insert_odds = $height_data_hashref->{insert_probs}[$i];
+      my $insert_fill = '#ffffff';
+      my $insert_text = '#666666';
+      if ($insert_odds > 0.1 ) {
+        $insert_fill = '#d7301f';
+        $insert_text = '#ffffff';
+      }
+      elsif ( $insert_odds > 0.05 ) {
+        $insert_fill = '#fc8d59';
+      }
+      elsif ( $insert_odds > 0.03 ) {
+        $insert_fill = '#fdcc8a';
+      }
 
-    # fill in the insert odds
-    my $insert_odds = $height_data_hashref->{insert_probs}[$i];
-    my $insert_fill = '#ffffff';
-    my $insert_text = '#666666';
-    if ($insert_odds > 0.1 ) {
-      $insert_fill = '#d7301f';
-      $insert_text = '#ffffff';
+      $image->box(
+        color => $insert_fill,
+        xmin => $left_gutter + ($i * $column_width) + 1,
+        ymin => $height - 30,
+        xmax => ($left_gutter + ($i * $column_width) + $column_width) - 1,
+        ymax => $height - 15,
+        filled => 1
+      );
+
+      $image->align_string(
+        x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+        y => $height - 27,
+        font => $font,
+        string => $insert_odds,
+        color => $insert_text,
+        halign => 'center',
+        valign => 'top',
+        size => 10,
+        aa => 1
+      );
+
+
+      # fill in the insert length
+      my $insert_len = $height_data_hashref->{insert_lengths}[$i];
+      my $length_fill = '#ffffff';
+      my $length_text = '#666666';
+
+      if ($insert_len > 9 ) {
+        $length_fill = '#d7301f';
+        $length_text = '#ffffff';
+      }
+      elsif ( $insert_len > 7 ) {
+        $length_fill = '#fc8d59';
+      }
+      elsif ( $insert_len > 4 ) {
+        $length_fill = '#fdcc8a';
+      }
+
+      $image->box(
+        color => $length_fill,
+        xmin => $left_gutter + ($i * $column_width) + 1,
+        ymin => $height - 15,
+        xmax => ($left_gutter + ($i * $column_width) + $column_width) - 1,
+        ymax => $height,
+        filled => 1
+      );
+      $image->align_string(
+        x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+        y => $height - 12,
+        font => $font,
+        string => $height_data_hashref->{insert_lengths}[$i],
+        color => $length_text,
+        halign => 'center',
+        valign => 'top',
+        size => 10,
+        aa => 1
+      );
     }
-    elsif ( $insert_odds > 0.05 ) {
-      $insert_fill = '#fc8d59';
-    }
-    elsif ( $insert_odds > 0.03 ) {
-      $insert_fill = '#fdcc8a';
-    }
-
-    $image->box(
-      color => $insert_fill,
-      xmin => $left_gutter + ($i * $column_width) + 1,
-      ymin => $height - 30,
-      xmax => ($left_gutter + ($i * $column_width) + $column_width) - 1,
-      ymax => $height - 15,
-      filled => 1
-    );
-
-    $image->align_string(
-      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
-      y => $height - 27,
-      font => $font,
-      string => $insert_odds,
-      color => $insert_text,
-      halign => 'center',
-      valign => 'top',
-      size => 10,
-      aa => 1
-    );
-
-
-    # fill in the insert length
-    my $insert_len = $height_data_hashref->{insert_lengths}[$i];
-    my $length_fill = '#ffffff';
-    my $length_text = '#666666';
-
-    if ($insert_len > 9 ) {
-      $length_fill = '#d7301f';
-      $length_text = '#ffffff';
-    }
-    elsif ( $insert_len > 7 ) {
-      $length_fill = '#fc8d59';
-    }
-    elsif ( $insert_len > 4 ) {
-      $length_fill = '#fdcc8a';
-    }
-
-    $image->box(
-      color => $length_fill,
-      xmin => $left_gutter + ($i * $column_width) + 1,
-      ymin => $height - 15,
-      xmax => ($left_gutter + ($i * $column_width) + $column_width) - 1,
-      ymax => $height,
-      filled => 1
-    );
-    $image->align_string(
-      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
-      y => $height - 12,
-      font => $font,
-      string => $height_data_hashref->{insert_lengths}[$i],
-      color => $length_text,
-      halign => 'center',
-      valign => 'top',
-      size => 10,
-      aa => 1
-    );
-
 
     # draw the logo letters
     if ($height_data_hashref->{mmline}[$i] == 1) {# the column is masked
@@ -545,7 +566,7 @@ sub _build_png {
         if ($values[1] > 0.01) { # the letter is significant enough to draw
           my $letter_color = $colors->{$values[0]};
           my $letter_height = (1 * $values[1]) / $max_height;
-          my $glyph_height = $letter_height * ($height - 45);
+          my $glyph_height = $letter_height * ($height - $offset);
 
           # there seems to be a reproducible difference between the font height
           # requested and the height that is rendered. This attempts to correct
@@ -573,7 +594,7 @@ sub _build_png {
 
           if ($debug) {
             my $xmin = $left_gutter + ($i * $column_width);
-            my $ymax = ($height - 45) - $previous_height;
+            my $ymax = ($height - $offset) - $previous_height;
             $image->box(
               color => $colors->{'Q'},
               xmin => $xmin,
@@ -584,7 +605,7 @@ sub _build_png {
           }
 
           my $x = $left_gutter + ($i * $column_width);
-          my $y = ($height - 45) - $previous_height - $bbox->text_height;
+          my $y = ($height - $offset) - $previous_height - $bbox->text_height;
 
           $image->string(
             font => $bold_font,
@@ -642,6 +663,7 @@ sub _build_png {
     color => '#666666',
     aa => 1
   );
+
   # draw the line above the insert length section
   $image->line(
     color => '#999999',
@@ -652,31 +674,36 @@ sub _build_png {
     aa => 1,
     endp => 1
   );
-  # draw the line above the insert probability section
-  $image->line(
-    color => '#999999',
-    x1 => $left_gutter,
-    x2 => $width,
-    y1 => $height - 30,
-    y2 => $height - 30,
-    aa => 1,
-    endp => 1
-  );
-  # draw the line above the delete probability section
-  $image->line(
-    color => '#999999',
-    x1 => $left_gutter - 5, # extend a little for the 0 tick mark
-    x2 => $width,
-    y1 => $height - 45,
-    y2 => $height - 45,
-    aa => 1,
-    endp => 1
-  );
+
+  if ($show_inserts) {
+    # draw the line above the insert probability section
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter,
+      x2 => $width,
+      y1 => $height - 30,
+      y2 => $height - 30,
+      aa => 1,
+      endp => 1
+    );
+    # draw the line above the delete probability section
+    $image->line(
+      color => '#999999',
+      x1 => $left_gutter - 5, # extend a little for the 0 tick mark
+      x2 => $width,
+      y1 => $height - 45,
+      y2 => $height - 45,
+      aa => 1,
+      endp => 1
+    );
+  }
+
+
   $image->align_string(
     font => $font,
     string => '0',
     x => $left_gutter - 5,
-    y => $height - 45,
+    y => $height - $offset,
     size => 10,
     halign => 'right',
     valign => 'center',
@@ -687,8 +714,8 @@ sub _build_png {
     color => '#999999',
     x1 => $left_gutter - 5, # extend a little for the midpoint tick mark
     x2 => $left_gutter,
-    y1 => ($height - 45) / 2,
-    y2 => ($height - 45) / 2,
+    y1 => ($height - $offset) / 2,
+    y2 => ($height - $offset) / 2,
     aa => 1,
     endp => 1
   );
@@ -696,7 +723,7 @@ sub _build_png {
     font => $font,
     string => sprintf('%.2f', $max_height / 2),
     x => $left_gutter - 5,
-    y => ($height - 45) / 2,
+    y => ($height - $offset) / 2,
     size => 10,
     halign => 'right',
     valign => 'center',
@@ -738,7 +765,12 @@ sub _build_svg {
   my $column_count = scalar @{$height_data_hashref->{height_arr}};
   my $width        = $column_count * $column_width;
 
+  my $show_inserts = (exists $height_data_hashref->{processing} && $height_data_hashref->{processing} =~ /observed|weighted/) ? 0 : 1;
 
+  my $offset = 15;
+  if ($show_inserts) {
+    $offset = 45;
+  }
 
   my $max_height = $height_data_hashref->{max_height_obs};
   if (defined $scaled) {
@@ -786,25 +818,27 @@ sub _build_svg {
       }
     );
     # draw delete probability section ticks
-    $svg->line(
-      x1 => $left_gutter + ($i * $column_width),
-      x2 => $left_gutter + ($i * $column_width),
-      y1 => $height - 45,
-      y2 => $height - 40,
-      style => {
-        stroke => '#999',
-      }
-    );
-    # draw insert probability section ticks
-    $svg->line(
-      x1 => $left_gutter + ($i * $column_width),
-      x2 => $left_gutter + ($i * $column_width),
-      y1 => $height - 30,
-      y2 => $height - 25,
-      style => {
-        stroke => '#999',
-      }
-    );
+    if ($show_inserts) {
+      $svg->line(
+        x1 => $left_gutter + ($i * $column_width),
+        x2 => $left_gutter + ($i * $column_width),
+        y1 => $height - 45,
+        y2 => $height - 40,
+        style => {
+          stroke => '#999',
+        }
+      );
+      # draw insert probability section ticks
+      $svg->line(
+        x1 => $left_gutter + ($i * $column_width),
+        x2 => $left_gutter + ($i * $column_width),
+        y1 => $height - 30,
+        y2 => $height - 25,
+        style => {
+          stroke => '#999',
+        }
+      );
+    }
     # draw insert length section ticks
     $svg->line(
       x1 => $left_gutter + ($i * $column_width),
@@ -832,18 +866,22 @@ sub _build_svg {
       $delete_fill = '#bdd7e7';
     }
 
+    my $rect_y = ($show_inserts) ? $height - 45 : $height - 15;
+
     $svg->rect(
       x => $left_gutter + ($i * $column_width) + 1,
-      y => $height - 45,
+      y => $rect_y,
       width => $column_width,
       height => 15,
       style  => {
         fill => $delete_fill,
       }
     );
+
+    my $text_y = ($show_inserts) ? $height - 34 : $height - 4;
     $svg->text(
       x => $left_gutter + ($i * $column_width) + ($column_width / 2),
-      y => $height - 34,
+      y => $text_y,
       style => {
         'font-family' => 'Arial',
         'font-size'   => '10px',
@@ -853,76 +891,78 @@ sub _build_svg {
     )->cdata($delete_odds);
 
 
-    # fill in the insert odds
-    my $insert_odds = $height_data_hashref->{insert_probs}[$i];
-    my $insert_fill = '#ffffff';
-    my $insert_text = '#666666';
-    if ($insert_odds > 0.1 ) {
-      $insert_fill = '#d7301f';
-      $insert_text = '#ffffff';
-    }
-    elsif ( $insert_odds > 0.05 ) {
-      $insert_fill = '#fc8d59';
-    }
-    elsif ( $insert_odds > 0.03 ) {
-      $insert_fill = '#fdcc8a';
-    }
-
-    $svg->rect(
-      x => $left_gutter + ($i * $column_width) + 1,
-      y => $height - 30,
-      width => $column_width,
-      height => 15,
-      style  => {
-        fill => $insert_fill,
+    if ($show_inserts) {
+      # fill in the insert odds
+      my $insert_odds = $height_data_hashref->{insert_probs}[$i];
+      my $insert_fill = '#ffffff';
+      my $insert_text = '#666666';
+      if ($insert_odds > 0.1 ) {
+        $insert_fill = '#d7301f';
+        $insert_text = '#ffffff';
       }
-    );
-    $svg->text(
-      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
-      y => $height - 19,
-      style => {
-        'font-family' => 'Arial',
-        'font-size'   => '10px',
-        'fill'        => $insert_text,
-        'text-anchor' => 'middle',
+      elsif ( $insert_odds > 0.05 ) {
+        $insert_fill = '#fc8d59';
       }
-    )->cdata($insert_odds);
-
-    # fill in the insert length
-    my $insert_len = $height_data_hashref->{insert_lengths}[$i];
-    my $length_fill = '#ffffff';
-    my $length_text = '#666666';
-
-    if ($insert_len > 9 ) {
-      $length_fill = '#d7301f';
-      $length_text = '#ffffff';
-    }
-    elsif ( $insert_len > 7 ) {
-      $length_fill = '#fc8d59';
-    }
-    elsif ( $insert_len > 4 ) {
-      $length_fill = '#fdcc8a';
-    }
-
-    $svg->rect(
-      x => $left_gutter + ($i * $column_width) + 1,
-      y => $height - 15,
-      width => $column_width,
-      height => 15,
-      style  => {
-        fill => $length_fill,
+      elsif ( $insert_odds > 0.03 ) {
+        $insert_fill = '#fdcc8a';
       }
-    );
-    $svg->text(
-      x => $left_gutter + ($i * $column_width) + ($column_width / 2),
-      y => $height - 4,
-      style => {
-        'font-family' => 'Arial',
-        'font-size'   => '10px',
-        'fill'        => $length_text,
-        'text-anchor' => 'middle',
+
+      $svg->rect(
+        x => $left_gutter + ($i * $column_width) + 1,
+        y => $height - 30,
+        width => $column_width,
+        height => 15,
+        style  => {
+          fill => $insert_fill,
+        }
+      );
+      $svg->text(
+        x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+        y => $height - 19,
+        style => {
+          'font-family' => 'Arial',
+          'font-size'   => '10px',
+          'fill'        => $insert_text,
+          'text-anchor' => 'middle',
+        }
+      )->cdata($insert_odds);
+
+      # fill in the insert length
+      my $insert_len = $height_data_hashref->{insert_lengths}[$i];
+      my $length_fill = '#ffffff';
+      my $length_text = '#666666';
+
+      if ($insert_len > 9 ) {
+        $length_fill = '#d7301f';
+        $length_text = '#ffffff';
       }
-    )->cdata($height_data_hashref->{insert_lengths}[$i]);
+      elsif ( $insert_len > 7 ) {
+        $length_fill = '#fc8d59';
+      }
+      elsif ( $insert_len > 4 ) {
+        $length_fill = '#fdcc8a';
+      }
+
+      $svg->rect(
+        x => $left_gutter + ($i * $column_width) + 1,
+        y => $height - 15,
+        width => $column_width,
+        height => 15,
+        style  => {
+          fill => $length_fill,
+        }
+      );
+      $svg->text(
+        x => $left_gutter + ($i * $column_width) + ($column_width / 2),
+        y => $height - 4,
+        style => {
+          'font-family' => 'Arial',
+          'font-size'   => '10px',
+          'fill'        => $length_text,
+          'text-anchor' => 'middle',
+        }
+      )->cdata($height_data_hashref->{insert_lengths}[$i]);
+    }
 
     # draw the letters
     if ($height_data_hashref->{mmline}[$i] == 1) {# the column is masked
@@ -947,10 +987,10 @@ sub _build_svg {
         if ($values[1] > 0.01) { # the letter is significant enough to draw
           my $letter_color = $colors->{$values[0]};
           my $letter_height = (1 * $values[1]) / $max_height;
-          my $glyph_height = $letter_height * ($height - 45);
+          my $glyph_height = $letter_height * ($height - $offset);
 
           my $x = $left_gutter + ($i * $column_width) + ($column_width / 2);
-          my $y = ($height - 45) - $previous_height;
+          my $y = ($height - $offset) - $previous_height;
 
           my $rect_y = $y;
 
@@ -1060,29 +1100,34 @@ sub _build_svg {
       stroke => '#999',
     }
   );
-  # draw the line above the insert probability section
-  $svg->line(
-    x1 => $left_gutter,
-    x2 => $width,
-    y1 => $height - 30,
-    y2 => $height - 30,
-    style => {
-      stroke => '#999',
-    }
-  );
-  # draw the line above the delete probability section
-  $svg->line(
-    x1 => $left_gutter - 5, # extend a little for the 0 tick mark
-    x2 => $width,
-    y1 => $height - 45,
-    y2 => $height - 45,
-    style => {
-      stroke => '#999',
-    }
-  );
+  if ($show_inserts) {
+    # draw the line above the insert probability section
+    $svg->line(
+      x1 => $left_gutter,
+      x2 => $width,
+      y1 => $height - 30,
+      y2 => $height - 30,
+      style => {
+        stroke => '#999',
+      }
+    );
+    # draw the line above the delete probability section
+    $svg->line(
+      x1 => $left_gutter - 5, # extend a little for the 0 tick mark
+      x2 => $width,
+      y1 => $height - 45,
+      y2 => $height - 45,
+      style => {
+        stroke => '#999',
+      }
+    );
+  }
+
+
+
   $svg->text(
     x => $left_gutter - 5,
-    y => $height - 45,
+    y => $height - $offset,
     style => {
       'font-family' => 'Arial',
       'font-size'   => '10px',
@@ -1093,15 +1138,15 @@ sub _build_svg {
   $svg->line(
     x1 => $left_gutter - 5, # extend a little for the midpoint tick mark
     x2 => $left_gutter,
-    y1 => ($height - 45) / 2,
-    y2 => ($height - 45) / 2,
+    y1 => ($height - $offset) / 2,
+    y2 => ($height - $offset) / 2,
     style => {
       stroke => '#999',
     }
   );
   $svg->text(
     x => $left_gutter - 5,
-    y => (($height - 45) / 2) + 3,
+    y => (($height - $offset) / 2) + 3,
     style => {
       'font-family' => 'Arial',
       'font-size'   => '10px',
@@ -1181,8 +1226,8 @@ sub as_json {
 =cut
 
 sub as_png {
-  my ($self, $method, $scaled) = @_;
-  return hmmToLogoPNG($self->hmm_file, $method, $scaled);
+  my ($self, $method, $scaled, $processing) = @_;
+  return hmmToLogoPNG($self->hmm_file, $method, $scaled, $processing);
 }
 
 =head2 as_svg
@@ -1190,8 +1235,8 @@ sub as_png {
 =cut
 
 sub as_svg {
-  my ($self, $method, $scaled) = @_;
-  return hmmToLogoSVG($self->hmm_file, $method, $scaled);
+  my ($self, $method, $scaled, $processing) = @_;
+  return hmmToLogoSVG($self->hmm_file, $method, $scaled, $processing);
 }
 
 =head2 dl_load_flags
