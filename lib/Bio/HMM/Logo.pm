@@ -6,6 +6,7 @@ use JSON;
 use File::Spec;
 use Imager ':handy';
 use SVG;
+use Consensus::Colors;
 
 
 =head1 NAME
@@ -225,7 +226,10 @@ sub hmmToLogoJson {
 sub hmmToLogoPNG {
   my ($hmmfile, $method, $scaled, $processing) = @_;
   my $height_data_hashref = hmmToLogo($hmmfile, $method, $processing);
-  return _build_png($height_data_hashref, $scaled);
+  return _build_png({
+    data => $height_data_hashref,
+    scaled => $scaled
+  });
 }
 
 =head2 hmmToLogoSVG
@@ -310,10 +314,23 @@ sub _image_height {
 =cut
 
 sub _build_png {
-  my ($height_data_hashref, $scaled, $debug) = @_;
+  my $input = shift;
+  my $height_data_hashref = $input->{data};
+  my $scaled              = $input->{scaled};
+  my $colorscheme         = $input->{colorscheme} || 'default';
+  my $debug               = $input->{debug};
+
   my $alphabet = (exists $height_data_hashref->{alphabet}) ?
                    $height_data_hashref->{alphabet} : 'dna';
 
+
+  my $color_map = undef;
+  if (exists $height_data_hashref->{'probs_arr'} && $colorscheme eq 'consensus') {
+    my $cc = Consensus::Colors->new({
+      probs_arr => $height_data_hashref->{'probs_arr'}
+    });
+    $color_map = $cc->color_map();
+  }
 
   my $colors = _colors_by_alphabet($alphabet);
 
@@ -564,7 +581,13 @@ sub _build_png {
       for my $letter (@$column) {
         my @values = split ':', $letter, 2;
         if ($values[1] > 0.01) { # the letter is significant enough to draw
-          my $letter_color = $colors->{$values[0]};
+          my $letter_color = undef;
+          if ($color_map && $alphabet eq 'aa') {
+            $letter_color = $color_map->[$i]->{$values[0]};
+          }
+          else {
+            $letter_color = $colors->{$values[0]};
+          }
           my $letter_height = (1 * $values[1]) / $max_height;
           my $glyph_height = $letter_height * ($height - $offset);
 
@@ -755,6 +778,14 @@ sub _build_svg {
   my ($height_data_hashref, $scaled, $debug) = @_;
   my $alphabet = (exists $height_data_hashref->{alphabet}) ?
                    $height_data_hashref->{alphabet} : 'dna';
+
+  my $color_map = undef;
+  if (exists $height_data_hashref->{'probs_arr'}) {
+    my $cc = Consensus::Colors->new({
+      probs_arr => $height_data_hashref->{'probs_arr'}
+    });
+    $color_map = $cc->color_map();
+  }
 
   my $colors = _colors_by_alphabet($alphabet);
 
@@ -985,7 +1016,13 @@ sub _build_svg {
       for my $letter (@$column) {
         my @values = split ':', $letter, 2;
         if ($values[1] > 0.01) { # the letter is significant enough to draw
-          my $letter_color = $colors->{$values[0]};
+          my $letter_color = undef;
+          if ($color_map && $alphabet eq 'aa') {
+            $letter_color = $color_map->[$i]->{$values[0]};
+          }
+          else {
+            $letter_color = $colors->{$values[0]};
+          }
           my $letter_height = (1 * $values[1]) / $max_height;
           my $glyph_height = $letter_height * ($height - $offset);
 

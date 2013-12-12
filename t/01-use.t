@@ -22,27 +22,34 @@ my $expected_obj = decode_json $expected;
 
 cmp_deeply($logo_obj, $expected_obj, 'Checking The logo json structure was created correctly. If this failed, check that you have the current version of Bio::HMM::Logo installed.');
 
-my $png = undef;
-$png = Bio::HMM::Logo::hmmToLogoPNG( $hmmfile );
-
 # this is for testing score height calculations on an amino acid hmm
 my $png_json = read_file( $FindBin::Bin . '/data/score_calc.json' );
 my $png_input = decode_json $png_json;
-my $aa_png = Bio::HMM::Logo::_build_png( $png_input, 1, 'debug');
-open my $png_file, '>', '/tmp/logo_test.png';
-binmode $png_file;
-print $png_file $aa_png;
-close $png_file;
+my $aa_png = Bio::HMM::Logo::_build_png({
+  data => $png_input,
+  scaled => 1,
+  debug => 'debug'
+});
+open my $build_file, '>', '/tmp/logo_build_png.png';
+binmode $build_file;
+print $build_file $aa_png;
+close $build_file;
 
 my $svg = Bio::HMM::Logo::hmmToLogoSVG( $hmmfile );
-
 open my $svg_file, '>', '/tmp/logo_test.svg';
 print $svg_file $svg;
 close $svg_file;
-
 
 # test corrupt files
 $logo_json = undef;
 my $corrupted = $FindBin::Bin . '/data/test.json';
 dies_ok {$logo_json =  Bio::HMM::Logo::hmmToLogoJson( $corrupted ) } q(Expect the hmmToLogoJson method to die if hmm file is bad);
 like $@, qr|unable to open HMM file at|, q(Error message should report inability to open HMM file);
+
+my $png = undef;
+$hmmfile = $FindBin::Bin . '/data/amino.hmm';
+$png = Bio::HMM::Logo::hmmToLogoPNG( $hmmfile );
+open my $png_file, '>', '/tmp/logo_test.png';
+binmode $png_file;
+print $png_file $png;
+close $png_file;

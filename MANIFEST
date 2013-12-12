@@ -10,6 +10,7 @@ Makefile.PL
 MANIFEST			This list of files
 README
 README.md
+scripts/test_logo_gen
 src/aclocal.m4
 src/autobuild/00README
 src/autobuild/autobuild.pl
@@ -32,6 +33,7 @@ src/contrib/p7_thermo.c
 src/contrib/p7_thermo.h
 src/COPYRIGHT
 src/documentation/Makefile.in
+src/documentation/man/alimask.man
 src/documentation/man/boilerplate-tail
 src/documentation/man/hmmalign.man
 src/documentation/man/hmmbuild.man
@@ -39,6 +41,7 @@ src/documentation/man/hmmconvert.man
 src/documentation/man/hmmemit.man
 src/documentation/man/hmmer.man
 src/documentation/man/hmmfetch.man
+src/documentation/man/hmmpgmd.man
 src/documentation/man/hmmpress.man
 src/documentation/man/hmmscan.man
 src/documentation/man/hmmsearch.man
@@ -46,6 +49,8 @@ src/documentation/man/hmmsim.man
 src/documentation/man/hmmstat.man
 src/documentation/man/jackhmmer.man
 src/documentation/man/Makefile.in
+src/documentation/man/nhmmer.man
+src/documentation/man/nhmmscan.man
 src/documentation/man/phmmer.man
 src/documentation/userguide/ack.tex
 src/documentation/userguide/copyright.tex.in
@@ -176,6 +181,8 @@ src/easel/esl_buffer.tex
 src/easel/esl_cluster.c
 src/easel/esl_cluster.h
 src/easel/esl_cluster.tex
+src/easel/esl_composition.c
+src/easel/esl_composition.h
 src/easel/esl_config.h.in
 src/easel/esl_dirichlet.c
 src/easel/esl_dirichlet.h
@@ -330,6 +337,8 @@ src/easel/esl_swat.c
 src/easel/esl_swat.tex
 src/easel/esl_threads.c
 src/easel/esl_threads.h
+src/easel/esl_translate.c
+src/easel/esl_translate.h
 src/easel/esl_tree.c
 src/easel/esl_tree.h
 src/easel/esl_tree.tex
@@ -421,6 +430,7 @@ src/easel/miniapps/esl-shuffle.man
 src/easel/miniapps/esl-ssdraw.c
 src/easel/miniapps/esl-ssdraw.itest.pl
 src/easel/miniapps/esl-ssdraw.man
+src/easel/miniapps/esl-stranslate.c
 src/easel/miniapps/esl-weight.c
 src/easel/miniapps/esl-weight.man
 src/easel/miniapps/Makefile.in
@@ -505,7 +515,7 @@ src/release-notes/RELEASE-3.0b2
 src/release-notes/RELEASE-3.0b3
 src/release-notes/RELEASE-3.0rc1
 src/release-notes/RELEASE-3.0rc2
-src/release-notes/RELEASE-3.1
+src/release-notes/RELEASE-3.1b1
 src/src/alimask.c
 src/src/build.c
 src/src/cachedb.c
@@ -514,10 +524,10 @@ src/src/emit.c
 src/src/errors.c
 src/src/evalues.c
 src/src/eweight.c
-src/src/exactmatch.c
 src/src/fm_alphabet.c
 src/src/fm_general.c
-src/src/fm_msv.c
+src/src/fm_sse.c
+src/src/fm_ssv.c
 src/src/generic_decoding.c
 src/src/generic_fwdback.c
 src/src/generic_fwdback_banded.c
@@ -541,11 +551,13 @@ src/src/hmmdwrkr.c
 src/src/hmmemit.c
 src/src/hmmer.c
 src/src/hmmer.h
+src/src/hmmerfm-exactmatch.c
 src/src/hmmfetch.c
 src/src/hmmlogo.c
 src/src/hmmpgmd.c
 src/src/hmmpgmd.h
 src/src/hmmpgmd2msa.c
+src/src/hmmpgmd_client_example.pl
 src/src/hmmpress.c
 src/src/hmmpress.itest.pl
 src/src/hmmscan.c
@@ -553,7 +565,6 @@ src/src/hmmsearch.c
 src/src/hmmsim.c
 src/src/hmmstat.c
 src/src/impl_dummy/decoding.c
-src/src/impl_dummy/fm.c
 src/src/impl_dummy/fwdback.c
 src/src/impl_dummy/impl_dummy.h
 src/src/impl_dummy/io.c
@@ -570,7 +581,6 @@ src/src/impl_dummy/vitscore.c
 src/src/impl_sse/00MANIFEST
 src/src/impl_sse/decoding.c
 src/src/impl_sse/fbparsers.tex
-src/src/impl_sse/fm.c
 src/src/impl_sse/fwdback.c
 src/src/impl_sse/impl_sse.h
 src/src/impl_sse/io.c
@@ -588,7 +598,6 @@ src/src/impl_sse/vitfilter.c
 src/src/impl_sse/vitscore.c
 src/src/impl_vmx/00MANIFEST
 src/src/impl_vmx/decoding.c
-src/src/impl_vmx/fm.c
 src/src/impl_vmx/fwdback.c
 src/src/impl_vmx/impl_vmx.h
 src/src/impl_vmx/io.c
@@ -606,7 +615,7 @@ src/src/itest_brute.c
 src/src/jackhmmer.c
 src/src/logsum.c
 src/src/Makefile.in
-src/src/makenhmmerdb.c
+src/src/makehmmerdb.c
 src/src/modelconfig.c
 src/src/modelstats.c
 src/src/mpisupport.c
@@ -715,6 +724,13 @@ src/tutorial/globins4.out
 src/tutorial/globins4.sto
 src/tutorial/globins45.fa
 src/tutorial/HBB_HUMAN
+src/tutorial/MADE1.hmm
+src/tutorial/MADE1.hmm.h3f
+src/tutorial/MADE1.hmm.h3i
+src/tutorial/MADE1.hmm.h3m
+src/tutorial/MADE1.hmm.h3p
+src/tutorial/MADE1.out
+src/tutorial/MADE1.sto
 src/tutorial/minifam
 src/tutorial/minifam.h3f
 src/tutorial/minifam.h3i
@@ -722,15 +738,18 @@ src/tutorial/minifam.h3m
 src/tutorial/minifam.h3p
 src/tutorial/Pkinase.hmm
 src/tutorial/Pkinase.sto
-src/tutorial/SNORD96.hmm
-src/tutorial/SNORD96.out
-src/tutorial/SNORD96.sto
 t/.01-use.t.swp
 t/00-load.t
+t/01-oo-use.t
 t/01-use.t
 t/boilerplate.t
-t/data/test.hmm
+t/data/amino.hmm
+t/data/amino.json
+t/data/dna.hmm
+t/data/png.json
+t/data/score_calc.json
 t/data/test.json
 t/manifest.t
 t/pod-coverage.t
 t/pod.t
+tags
