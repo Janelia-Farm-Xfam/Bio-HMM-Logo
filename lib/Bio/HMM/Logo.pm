@@ -499,6 +499,16 @@ sub _build_png {
         aa => 1
       );
 
+      $image->line(
+        color => $insert_fill,
+        x1 => ($left_gutter + ($i * $column_width) + $column_width),
+        y1 => $height - 15,
+        x2 => ($left_gutter + ($i * $column_width) + $column_width),
+        y2 => 5,
+        aa => 1,
+        endp => 1
+      );
+
 
       # fill in the insert length
       my $insert_len = $height_data_hashref->{insert_lengths}[$i];
@@ -906,6 +916,16 @@ sub _build_svg {
           'text-anchor' => 'middle',
         }
       )->cdata($insert_odds);
+
+      $svg->line(
+        x1 => $left_gutter + ($i * $column_width) + $column_width,
+        x2 => $left_gutter + ($i * $column_width) + $column_width,
+        y1 => $height - 15,
+        y2 => 5,
+        style => {
+          stroke => $insert_fill,
+        }
+      );
 
       # fill in the insert length
       my $insert_len = $height_data_hashref->{insert_lengths}[$i];
