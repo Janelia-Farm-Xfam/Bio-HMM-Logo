@@ -224,11 +224,12 @@ sub hmmToLogoJson {
 =cut
 
 sub hmmToLogoPNG {
-  my ($hmmfile, $method, $scaled, $processing) = @_;
+  my ($hmmfile, $method, $scaled, $processing, $colorscheme) = @_;
   my $height_data_hashref = hmmToLogo($hmmfile, $method, $processing);
   return _build_png({
-    data => $height_data_hashref,
-    scaled => $scaled
+    data   => $height_data_hashref,
+    scaled => $scaled,
+    colorscheme => $colorscheme,
   });
 }
 
@@ -237,9 +238,13 @@ sub hmmToLogoPNG {
 =cut
 
 sub hmmToLogoSVG {
-  my ($hmmfile, $method, $scaled, $processing) = @_;
+  my ($hmmfile, $method, $scaled, $processing, $colorscheme) = @_;
   my $height_data_hashref = hmmToLogo($hmmfile, $method, $processing);
-  return _build_svg($height_data_hashref, $scaled);
+  return _build_svg({
+    data   => $height_data_hashref,
+    scaled => $scaled,
+    colorscheme => $colorscheme,
+  });
 }
 
 
@@ -323,9 +328,8 @@ sub _build_png {
   my $alphabet = (exists $height_data_hashref->{alphabet}) ?
                    $height_data_hashref->{alphabet} : 'dna';
 
-
   my $color_map = undef;
-  if (exists $height_data_hashref->{'probs_arr'} && $colorscheme eq 'consensus') {
+  if (exists $height_data_hashref->{'probs_arr'} && $colorscheme eq 'consensus' && $alphabet eq 'aa') {
     my $cc = Consensus::Colors->new({
       probs_arr => $height_data_hashref->{'probs_arr'}
     });
@@ -775,12 +779,17 @@ sub _build_png {
 =cut
 
 sub _build_svg {
-  my ($height_data_hashref, $scaled, $debug) = @_;
+  my $input = shift;
+  my $height_data_hashref = $input->{data};
+  my $scaled              = $input->{scaled};
+  my $colorscheme         = $input->{colorscheme} || 'default';
+  my $debug               = $input->{debug};
+
   my $alphabet = (exists $height_data_hashref->{alphabet}) ?
                    $height_data_hashref->{alphabet} : 'dna';
 
   my $color_map = undef;
-  if (exists $height_data_hashref->{'probs_arr'}) {
+  if (exists $height_data_hashref->{'probs_arr'} && $colorscheme eq 'consensus' && $alphabet eq 'aa') {
     my $cc = Consensus::Colors->new({
       probs_arr => $height_data_hashref->{'probs_arr'}
     });
@@ -1263,8 +1272,8 @@ sub as_json {
 =cut
 
 sub as_png {
-  my ($self, $method, $scaled, $processing) = @_;
-  return hmmToLogoPNG($self->hmm_file, $method, $scaled, $processing);
+  my ($self, $method, $scaled, $processing, $colorscheme) = @_;
+  return hmmToLogoPNG($self->hmm_file, $method, $scaled, $processing, $colorscheme);
 }
 
 =head2 as_svg
@@ -1272,8 +1281,8 @@ sub as_png {
 =cut
 
 sub as_svg {
-  my ($self, $method, $scaled, $processing) = @_;
-  return hmmToLogoSVG($self->hmm_file, $method, $scaled, $processing);
+  my ($self, $method, $scaled, $processing, $colorscheme) = @_;
+  return hmmToLogoSVG($self->hmm_file, $method, $scaled, $processing, $colorscheme);
 }
 
 =head2 dl_load_flags
