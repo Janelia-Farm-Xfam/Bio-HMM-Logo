@@ -38,7 +38,7 @@ BEGIN {
 
 use Inline
   C        => "$src_file",
-  VERSION  => '0.02',
+  VERSION  => '0.03',
   ENABLE   => 'AUTOWRAP',
   INC      => "-I$hmmer_src_dir/src -I$hmmer_src_dir/easel",
   LIBS     => "-L$hmmer_src_dir/easel -L$hmmer_src_dir/src -lhmmer -leasel",
