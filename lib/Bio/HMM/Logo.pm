@@ -19,7 +19,7 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 my $src_file   = undef;
 my $typemaps   = undef;
@@ -368,7 +368,7 @@ sub _build_png {
   my $max_height = $height_data_hashref->{max_height_obs};
   if (defined $scaled) {
     if (exists $height_data_hashref->{height_calc}
-      && $height_data_hashref->{height_calc} eq 'emission') {
+      && $height_data_hashref->{height_calc} ne 'score') {
       $max_height = $height_data_hashref->{max_height_theory};
     }
   }
