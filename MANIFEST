@@ -738,7 +738,6 @@ src/tutorial/minifam.h3m
 src/tutorial/minifam.h3p
 src/tutorial/Pkinase.hmm
 src/tutorial/Pkinase.sto
-t/.01-use.t.swp
 t/00-load.t
 t/01-oo-use.t
 t/01-use.t
