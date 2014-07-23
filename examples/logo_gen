@@ -1,0 +1,34 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Bio::HMM::Logo;
+use FindBin;
+use Data::Printer;
+
+#find the path to your hmm file.
+my $hmmfile = $FindBin::Bin . '/data/dna.hmm';
+
+# create the logo object and pass it the path to the hmm file.
+my $logo = Bio::HMM::Logo->new({ hmmfile => $hmmfile });
+
+
+# generate the json string that can be used by the javascript
+# code to create an interactive graphic
+my $logo_json = $logo->as_json();
+p $logo_json;
+
+
+# create a static version of the logo and dump it to disk.
+my $logo_png = $logo->as_png();
+
+open my $image, '>', 'logo.png'
+  or die "Couldn't open logo.png for writing";
+
+binmode $image;
+
+print $image $logo_png;
+
+close $image;
+
+print "Have a look in logo.png for an example of the static image.\n";
