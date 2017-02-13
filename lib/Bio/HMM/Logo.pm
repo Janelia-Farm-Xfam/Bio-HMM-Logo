@@ -84,6 +84,9 @@ sub hmmToLogo {
     die "$hmmfile does not exist on disk!\n";
   }
   my $hmm = inline_read_hmm($hmmfile);
+  unless (inline_check_map_defined($hmm)) {
+    die "$hmmfile does not appear to have an alignment map (required)";
+  }
   my $abc = inline_get_abc($hmm);
 
   my $alph     = inline_get_alphabet_string($abc);

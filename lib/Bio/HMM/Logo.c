@@ -71,6 +71,16 @@ ERROR:
 }
 
 SV*
+inline_check_map_defined(SV *hmm_p) {
+    int status = 0;
+    P7_HMM       *hmm       = c_obj(hmm_p, P7_HMM);
+    if (hmm->flags & p7H_MAP)
+        return newSViv(1);
+    else
+        return newSViv(0);
+}
+
+SV*
 inline_get_relative_entropy_all (SV *hmm_p) {
   int           status;
   int           i, j;
