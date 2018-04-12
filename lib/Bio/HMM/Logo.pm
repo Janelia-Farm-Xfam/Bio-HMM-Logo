@@ -1297,6 +1297,7 @@ sub as_svg {
 =head2 inline_get_abc_type
 =head2 inline_get_alphabet_string
 =head2 inline_get_deleteP
+=head2 inline_check_map_defined
 =head2 inline_get_relative_entropy_all
 =head2 inline_get_insertLengths
 =head2 inline_get_insertP
